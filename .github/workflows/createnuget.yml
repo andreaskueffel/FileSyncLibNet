@@ -40,4 +40,7 @@ jobs:
         API_KEY: ${{ secrets.NUGET_API_KEY }}
       run: dotnet nuget push nuget/*.nupkg --api-key "$env:API_KEY" --source https://api.nuget.org/v3/index.json --no-symbols true
     - name: Tag
-      run: git tag ${{ steps.version.outputs.version }}
+      run: |
+      git tag  -a "${{ steps.version.outputs.version }}" -m "${{ steps.version.outputs.version }} released"
+      git push origin "${{ steps.version.outputs.version }}"
+      
