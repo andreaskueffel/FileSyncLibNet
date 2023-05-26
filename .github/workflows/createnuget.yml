@@ -37,9 +37,7 @@ jobs:
       run: dotnet pack --no-restore --configuration Release -p:Version=${{ steps.version.outputs.version }} -o nuget
     - name: Push
       if: github.ref == 'refs/heads/main'
-      env: 
-        API_KEY: ${{ secrets.NUGET_API_KEY }}
-      run: dotnet nuget push nuget/*.nupkg --api-key $env:API_KEY --no-symbols true
+      run: dotnet nuget push nuget/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --no-symbols true
     - name: Tag
       if: github.ref == 'refs/heads/main'
       run: |
