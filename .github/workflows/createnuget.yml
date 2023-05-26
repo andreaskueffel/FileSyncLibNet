@@ -25,6 +25,9 @@ jobs:
     - name: Git Version
       id: version
       uses: codacy/git-version@2.7.1
+      with:
+        release-branch: main
+        dev-branch: development
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
