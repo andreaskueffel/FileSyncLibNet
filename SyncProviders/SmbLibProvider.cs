@@ -3,7 +3,9 @@ using Microsoft.Extensions.Logging;
 using SMBLibrary;
 using SMBLibrary.Client;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FileAttributes = SMBLibrary.FileAttributes;
 
 namespace FileSyncLibNet.SyncProviders
@@ -32,14 +34,17 @@ namespace FileSyncLibNet.SyncProviders
         {
             get
             {
-                var remainingDestination = JobOptions.DestinationPath.Substring(Server.Length);
-                return remainingDestination.Split('/', '\\')[0];
+                var remainingDestination = JobOptions.DestinationPath.Substring(JobOptions.DestinationPath.IndexOf(Server) + Server.Length);
+                return remainingDestination.Trim('/', '\\').Split('/', '\\')[0];
             }
         }
-        string DestinationPath { get
+        string DestinationPath
+        {
+            get
             {
                 return JobOptions.DestinationPath.Substring(JobOptions.DestinationPath.IndexOf(Share) + Share.Length);
-            } }
+            }
+        }
 
         public SmbLibProvider(IFileSyncJobOptions options)
         {
@@ -59,19 +64,29 @@ namespace FileSyncLibNet.SyncProviders
             {
                 ConnectToShare(Server, Share, JobOptions.Credentials.Domain, JobOptions.Credentials.UserName, JobOptions.Credentials.Password);
             }
-
+            if (JobOptions.SyncDeleted)
+            {
+                var files = ListFiles(DestinationPath, true);
+                foreach(var file in files)
+                {
+                    var realFilePath = file.Substring(file.IndexOf(DestinationPath) + DestinationPath.Length).Trim('/', '\\');
+                    if (!_fi.Any(x => x.FullName.EndsWith(realFilePath)))
+                        DeleteFile(file);
+                }
+            }
             foreach (FileInfo f in _fi)
             {
                 bool copy = false;
                 var relativeFilename = f.FullName.Substring(Path.GetFullPath(JobOptions.SourcePath).Length);
-                var remotefile = new FileInfo(Path.Combine(DestinationPath, relativeFilename.TrimStart('\\')));
-                copy = !remotefile.Exists || remotefile.Length != f.Length;
+                var remotefile = Path.Combine(DestinationPath, relativeFilename.TrimStart('\\'));
+                var exists = FileExists(remotefile.Trim('/', '\\'), out long size);
+                copy = !exists || size != f.Length;
                 if (copy)
                 {
                     logger.LogDebug("Copy {A}", relativeFilename);
                     //File.Copy(f.FullName, remotefile.FullName, true);
                     //CopyFileWithBuffer(f, remotefile);
-                    CopyFileWithSmbLib(f, remotefile);
+                    WriteFile(f.FullName, remotefile);
 
                 }
                 else
@@ -81,23 +96,8 @@ namespace FileSyncLibNet.SyncProviders
 
 
 
-        void CopyFileWithBuffer(FileInfo source, FileInfo destination)
-        {
-            using (var outstream = new FileStream(destination.FullName, FileMode.Create, FileAccess.Write, FileShare.None, 4096 * 20))
-            using (var instream = new FileStream(source.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096 * 20))
-            {
-                instream.CopyTo(outstream);
-            }
-            //destination.CreationTime = source.CreationTime;
-            //destination.LastAccessTime = source.LastAccessTime;
-            destination.LastWriteTime = source.LastWriteTime;
-            //destination.Attributes = source.Attributes;
-
-        }
-        void CopyFileWithSmbLib(FileInfo source, FileInfo destination)
-        {
-            WriteFile(source.FullName, destination.FullName);
-        }
+      
+       
 
         public void ConnectToShare(string server, string shareName, string domain, string user, string password)
         {
@@ -135,7 +135,7 @@ namespace FileSyncLibNet.SyncProviders
             FileStream localFileStream = new FileStream(localFilePath, FileMode.Open, FileAccess.Read);
             object fileHandle;
             FileStatus fileStatus;
-            status = fileStore.CreateFile(out fileHandle, out fileStatus, remoteFilePath, AccessMask.GENERIC_WRITE | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.None, CreateDisposition.FILE_SUPERSEDE, CreateOptions.FILE_NON_DIRECTORY_FILE | CreateOptions.FILE_SYNCHRONOUS_IO_ALERT, null);
+            status = fileStore.CreateFile(out fileHandle, out fileStatus, remoteFilePath.Trim('/','\\'), AccessMask.GENERIC_WRITE | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.None, CreateDisposition.FILE_SUPERSEDE, CreateOptions.FILE_NON_DIRECTORY_FILE | CreateOptions.FILE_SYNCHRONOUS_IO_ALERT, null);
             if (status == NTStatus.STATUS_SUCCESS)
             {
                 int writeOffset = 0;
@@ -159,6 +159,80 @@ namespace FileSyncLibNet.SyncProviders
             }
             localFileStream.Dispose();
 
+        }
+        void DeleteFile(string filePath)
+        {
+            object fileHandle;
+            FileStatus fileStatus;
+            var status = fileStore.CreateFile(out fileHandle, out fileStatus, filePath.Trim('/','\\'), AccessMask.GENERIC_WRITE | AccessMask.DELETE | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.None, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE | CreateOptions.FILE_SYNCHRONOUS_IO_ALERT, null);
+
+            if (status == NTStatus.STATUS_SUCCESS)
+            {
+                FileDispositionInformation fileDispositionInformation = new FileDispositionInformation();
+                fileDispositionInformation.DeletePending = true;
+                status = fileStore.SetFileInformation(fileHandle, fileDispositionInformation);
+                bool deleteSucceeded = (status == NTStatus.STATUS_SUCCESS);
+                status = fileStore.CloseFile(fileHandle);
+            }
+
+        }
+        List<string> ListFiles(string subPath, bool recurse)
+        {
+            List<string> retval = new List<string>();
+            object directoryHandle;
+            FileStatus fileStatus;
+            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, subPath.Trim('/', '\\'), AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE, null);
+            if (status == NTStatus.STATUS_SUCCESS)
+            {
+                List<QueryDirectoryFileInformation> fileList;
+                status = fileStore.QueryDirectory(out fileList, directoryHandle, "*", FileInformationClass.FileDirectoryInformation);
+                if (status == NTStatus.STATUS_SUCCESS || status == NTStatus.STATUS_NO_MORE_FILES)
+                {
+
+                    foreach (FileDirectoryInformation file in fileList.Where(x => x is FileDirectoryInformation))
+                    {
+                        if (file.FileName == "." || file.FileName == "..")
+                            continue;
+
+                        if ((file.FileAttributes &= FileAttributes.Directory) == FileAttributes.Directory)
+                        {
+                            if (recurse)
+                            {
+                                try
+                                {
+                                    retval.AddRange(ListFiles(Path.Combine(subPath.Trim('/', '\\'), file.FileName), recurse));
+                                }
+                                catch { }
+                            }
+                        }
+                        else
+                        {
+                            retval.Add(Path.Combine(subPath.Trim('/', '\\'), file.FileName));
+                        }
+
+                    }
+
+                }
+                status = fileStore.CloseFile(directoryHandle);
+            }
+            return retval;
+        }
+
+        bool FileExists(string filepathFromShare, out long size)
+        {
+            object directoryHandle;
+            FileStatus fileStatus;
+            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, filepathFromShare.Trim('/', '\\'), AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE, null);
+            if (status == NTStatus.STATUS_SUCCESS)
+            {
+                status = fileStore.GetFileInformation(out FileInformation result, directoryHandle, FileInformationClass.FileStandardInformation);
+                size = (result as FileStandardInformation).EndOfFile;
+                status = fileStore.CloseFile(directoryHandle);
+                return true;
+            }
+            size = 0;
+            return false;
+            
         }
 
 
