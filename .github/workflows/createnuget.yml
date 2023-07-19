@@ -37,12 +37,12 @@ jobs:
       run: dotnet pack --no-restore --configuration Release -p:Version=${{ steps.version.outputs.version }} -o nuget
     - name: Push
       if: github.ref == 'refs/heads/main'
-      run: dotnet nuget push nuget/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --no-symbols true
+      run: dotnet nuget push nuget/*.nupkg  --skip-duplicate --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --no-symbols
     - name: Tag
       if: github.ref == 'refs/heads/main'
       run: |
         git config user.email "noreply@github.com"
         git config user.name "Github"
-        git tag  -a "${{ steps.version.outputs.version }}" -m "${{ steps.version.outputs.version }} released"
+        git tag  -a "${{ steps.version.outputs.version }}" -m "Version ${{ steps.version.outputs.version }} released"
         git push origin "${{ steps.version.outputs.version }}"
       
