@@ -12,13 +12,40 @@ namespace FileSyncLibNet.SyncProviders
     {
         SMB2Client client;
         ISMBFileStore fileStore;
-
+        string Server
+        {
+            get
+            {
+                if (JobOptions.DestinationPath.StartsWith("smb://", StringComparison.OrdinalIgnoreCase)) //Linux syntax
+                {
+                    //Pattern smb://ServerName/ShareName/Folder1/Folder2
+                    return JobOptions.DestinationPath.Substring(1);
+                }
+                else
+                {
+                    //Pattern \\ServerName\ShareName\Folder1\Folder2
+                    return (JobOptions.DestinationPath.StartsWith("\\\\") ? JobOptions.DestinationPath.Substring(2) : JobOptions.DestinationPath).Split('\\')[0];
+                }
+            }
+        }
+        string Share
+        {
+            get
+            {
+                var remainingDestination = JobOptions.DestinationPath.Substring(Server.Length);
+                return remainingDestination.Split('/', '\\')[0];
+            }
+        }
+        string DestinationPath { get
+            {
+                return JobOptions.DestinationPath.Substring(JobOptions.DestinationPath.IndexOf(Share) + Share.Length);
+            } }
 
         public SmbLibProvider(IFileSyncJobOptions options)
         {
             JobOptions = options;
             Directory.CreateDirectory(JobOptions.SourcePath);
-            Directory.CreateDirectory(JobOptions.DestinationPath);
+            //Directory.CreateDirectory(JobOptions.DestinationPath);
         }
 
         public override void SyncSourceToDest()
@@ -30,14 +57,14 @@ namespace FileSyncLibNet.SyncProviders
             //Dateien ins Backup kopieren
             if (JobOptions.Credentials != null)
             {
-                ConnectToShare("frei", JobOptions.Credentials.Domain, JobOptions.Credentials.UserName, JobOptions.Credentials.Password);
+                ConnectToShare(Server, Share, JobOptions.Credentials.Domain, JobOptions.Credentials.UserName, JobOptions.Credentials.Password);
             }
 
             foreach (FileInfo f in _fi)
             {
                 bool copy = false;
                 var relativeFilename = f.FullName.Substring(Path.GetFullPath(JobOptions.SourcePath).Length);
-                var remotefile = new FileInfo(Path.Combine(JobOptions.DestinationPath, relativeFilename.TrimStart('\\')));
+                var remotefile = new FileInfo(Path.Combine(DestinationPath, relativeFilename.TrimStart('\\')));
                 copy = !remotefile.Exists || remotefile.Length != f.Length;
                 if (copy)
                 {
@@ -69,14 +96,14 @@ namespace FileSyncLibNet.SyncProviders
         }
         void CopyFileWithSmbLib(FileInfo source, FileInfo destination)
         {
-            WriteFile(source.FullName, Path.Combine("DA\\Küffel\\NetworkCopyTest", destination.Name));
+            WriteFile(source.FullName, destination.FullName);
         }
 
-        public void ConnectToShare(string sharePath, string domain, string user, string password)
+        public void ConnectToShare(string server, string shareName, string domain, string user, string password)
         {
             NTStatus status;
             client = new SMB2Client(); // SMB2Client can be used as well
-            bool isConnected = client.Connect("PRA33", SMBTransportType.DirectTCPTransport);
+            bool isConnected = client.Connect(server, SMBTransportType.DirectTCPTransport);
             if (isConnected)
             {
                 status = client.Login(domain, user, password);
@@ -87,7 +114,7 @@ namespace FileSyncLibNet.SyncProviders
                 }
                 //client.Disconnect();
             }
-            fileStore = client.TreeConnect(sharePath, out status);
+            fileStore = client.TreeConnect(shareName, out status);
             if (status != NTStatus.STATUS_SUCCESS)
             {
                 throw new Exception("Failed to connect to share");
