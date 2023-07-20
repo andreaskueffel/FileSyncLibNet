@@ -135,6 +135,23 @@ namespace FileSyncLibNet.SyncProviders
             FileStream localFileStream = new FileStream(localFilePath, FileMode.Open, FileAccess.Read);
             object fileHandle;
             FileStatus fileStatus;
+            //Create folders recursive
+
+            var paths = remoteFilePath.Trim('/', '\\').Split('/', '\\');
+            if (paths.Length > 1)
+            {
+                string createpath = "";
+                for (int i = 0; i < paths.Length - 1; i++)
+                {
+                    createpath = Path.Combine(createpath, paths[i]);
+                    status = fileStore.CreateFile(out fileHandle, out fileStatus, createpath, AccessMask.GENERIC_WRITE | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.None, CreateDisposition.FILE_OPEN_IF, CreateOptions.FILE_DIRECTORY_FILE, null);
+                    if (status == NTStatus.STATUS_SUCCESS)
+                    {
+                        status = fileStore.CloseFile(fileHandle);
+                    }
+                }
+            }
+
             status = fileStore.CreateFile(out fileHandle, out fileStatus, remoteFilePath.Trim('/','\\'), AccessMask.GENERIC_WRITE | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.None, CreateDisposition.FILE_SUPERSEDE, CreateOptions.FILE_NON_DIRECTORY_FILE | CreateOptions.FILE_SYNCHRONOUS_IO_ALERT, null);
             if (status == NTStatus.STATUS_SUCCESS)
             {
