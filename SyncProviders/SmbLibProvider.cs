@@ -42,7 +42,7 @@ namespace FileSyncLibNet.SyncProviders
         {
             get
             {
-                return JobOptions.DestinationPath.Substring(JobOptions.DestinationPath.IndexOf(Share) + Share.Length);
+                return JobOptions.DestinationPath.Substring(JobOptions.DestinationPath.IndexOf(Share) + Share.Length).Replace('/','\\');
             }
         }
 
@@ -66,11 +66,11 @@ namespace FileSyncLibNet.SyncProviders
             }
             if (JobOptions.SyncDeleted)
             {
-                var files = ListFiles(DestinationPath, true);
-                foreach(var file in files)
+                var remoteFiles = ListFiles(DestinationPath, true);
+                foreach(var file in remoteFiles)
                 {
-                    var realFilePath = file.Substring(file.IndexOf(DestinationPath) + DestinationPath.Length).Trim('/', '\\');
-                    if (!_fi.Any(x => x.FullName.EndsWith(realFilePath)))
+                    var realFilePath = file.Substring(file.IndexOf(DestinationPath) + DestinationPath.Length).Trim('\\').Replace('/', '\\');
+                    if (!_fi.Any(x => x.FullName.Replace('/', '\\').EndsWith(realFilePath)))
                         DeleteFile(file);
                 }
             }
@@ -78,8 +78,8 @@ namespace FileSyncLibNet.SyncProviders
             {
                 bool copy = false;
                 var relativeFilename = f.FullName.Substring(Path.GetFullPath(JobOptions.SourcePath).Length);
-                var remotefile = Path.Combine(DestinationPath, relativeFilename.TrimStart('\\'));
-                var exists = FileExists(remotefile.Trim('/', '\\'), out long size);
+                var remotefile = Path.Combine(DestinationPath, relativeFilename.TrimStart('\\', '/')).Replace('/', '\\');
+                var exists = FileExists(remotefile, out long size);
                 copy = !exists || size != f.Length;
                 if (copy)
                 {
@@ -137,7 +137,7 @@ namespace FileSyncLibNet.SyncProviders
             FileStatus fileStatus;
             //Create folders recursive
 
-            var paths = remoteFilePath.Trim('/', '\\').Split('/', '\\');
+            var paths = remoteFilePath.Trim('\\').Split('\\');
             if (paths.Length > 1)
             {
                 string createpath = "";
@@ -152,7 +152,7 @@ namespace FileSyncLibNet.SyncProviders
                 }
             }
 
-            status = fileStore.CreateFile(out fileHandle, out fileStatus, remoteFilePath.Trim('/','\\'), AccessMask.GENERIC_WRITE | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.None, CreateDisposition.FILE_SUPERSEDE, CreateOptions.FILE_NON_DIRECTORY_FILE | CreateOptions.FILE_SYNCHRONOUS_IO_ALERT, null);
+            status = fileStore.CreateFile(out fileHandle, out fileStatus, remoteFilePath.Trim('\\'), AccessMask.GENERIC_WRITE | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.None, CreateDisposition.FILE_SUPERSEDE, CreateOptions.FILE_NON_DIRECTORY_FILE | CreateOptions.FILE_SYNCHRONOUS_IO_ALERT, null);
             if (status == NTStatus.STATUS_SUCCESS)
             {
                 int writeOffset = 0;
@@ -181,7 +181,7 @@ namespace FileSyncLibNet.SyncProviders
         {
             object fileHandle;
             FileStatus fileStatus;
-            var status = fileStore.CreateFile(out fileHandle, out fileStatus, filePath.Trim('/','\\'), AccessMask.GENERIC_WRITE | AccessMask.DELETE | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.None, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE | CreateOptions.FILE_SYNCHRONOUS_IO_ALERT, null);
+            var status = fileStore.CreateFile(out fileHandle, out fileStatus, filePath.Trim('\\'), AccessMask.GENERIC_WRITE | AccessMask.DELETE | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.None, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE | CreateOptions.FILE_SYNCHRONOUS_IO_ALERT, null);
 
             if (status == NTStatus.STATUS_SUCCESS)
             {
@@ -198,7 +198,7 @@ namespace FileSyncLibNet.SyncProviders
             List<string> retval = new List<string>();
             object directoryHandle;
             FileStatus fileStatus;
-            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, subPath.Trim('/', '\\'), AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE, null);
+            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, subPath.Trim('\\'), AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE, null);
             if (status == NTStatus.STATUS_SUCCESS)
             {
                 List<QueryDirectoryFileInformation> fileList;
@@ -217,14 +217,14 @@ namespace FileSyncLibNet.SyncProviders
                             {
                                 try
                                 {
-                                    retval.AddRange(ListFiles(Path.Combine(subPath.Trim('/', '\\'), file.FileName), recurse));
+                                    retval.AddRange(ListFiles(Path.Combine(subPath.Trim('\\'), file.FileName), recurse));
                                 }
                                 catch { }
                             }
                         }
                         else
                         {
-                            retval.Add(Path.Combine(subPath.Trim('/', '\\'), file.FileName));
+                            retval.Add(Path.Combine(subPath.Trim('\\'), file.FileName));
                         }
 
                     }
@@ -239,7 +239,7 @@ namespace FileSyncLibNet.SyncProviders
         {
             object directoryHandle;
             FileStatus fileStatus;
-            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, filepathFromShare.Trim('/', '\\'), AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE, null);
+            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, filepathFromShare.Trim('\\'), AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE, null);
             if (status == NTStatus.STATUS_SUCCESS)
             {
                 status = fileStore.GetFileInformation(out FileInformation result, directoryHandle, FileInformationClass.FileStandardInformation);
