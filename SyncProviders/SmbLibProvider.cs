@@ -42,7 +42,7 @@ namespace FileSyncLibNet.SyncProviders
         {
             get
             {
-                return JobOptions.DestinationPath.Substring(JobOptions.DestinationPath.IndexOf(Share) + Share.Length).Replace('/','\\');
+                return JobOptions.DestinationPath.Substring(JobOptions.DestinationPath.IndexOf(Share) + Share.Length).Replace('/', '\\');
             }
         }
 
@@ -67,7 +67,7 @@ namespace FileSyncLibNet.SyncProviders
             if (JobOptions.SyncDeleted)
             {
                 var remoteFiles = ListFiles(DestinationPath, true);
-                foreach(var file in remoteFiles)
+                foreach (var file in remoteFiles)
                 {
                     var realFilePath = file.Substring(file.IndexOf(DestinationPath) + DestinationPath.Length).Trim('\\').Replace('/', '\\');
                     if (!_fi.Any(x => x.FullName.Replace('/', '\\').EndsWith(realFilePath)))
@@ -96,8 +96,8 @@ namespace FileSyncLibNet.SyncProviders
 
 
 
-      
-       
+
+
 
         public void ConnectToShare(string server, string shareName, string domain, string user, string password)
         {
@@ -106,11 +106,16 @@ namespace FileSyncLibNet.SyncProviders
             bool isConnected = client.Connect(server, SMBTransportType.DirectTCPTransport);
             if (isConnected)
             {
+                logger.LogDebug("ConnectToShare with domain {A} and user {B} with {C} pass", domain, user, password.Select(x=>'*'));
                 status = client.Login(domain, user, password);
                 if (status == NTStatus.STATUS_SUCCESS)
                 {
                     //List<string> shares = client.ListShares(out status);
                     //client.Logoff();
+                }
+                else
+                {
+                    logger.LogError("ConnectToShare is status {A}", status);
                 }
                 //client.Disconnect();
             }
@@ -249,7 +254,7 @@ namespace FileSyncLibNet.SyncProviders
             }
             size = 0;
             return false;
-            
+
         }
 
 
