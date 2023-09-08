@@ -69,6 +69,11 @@ namespace FileSyncLibNet.FileSyncJob
             jobOptions.SearchPattern = searchPattern;
             return this;
         }
+        public IFileSyncJobOptionsBuilderSetProperties WithSubfolder(string subfolder)
+        {
+            jobOptions.Subfolders.Add(subfolder);
+            return this;
+        }
         public IFileSyncJobOptionsBuilderSetProperties WithInterval(TimeSpan interval)
         {
             jobOptions.Interval = interval;
@@ -118,6 +123,7 @@ namespace FileSyncLibNet.FileSyncJob
         IFileSyncJobOptionsBuilderSetProperties WithCredentials(string username, string password);
         IFileSyncJobOptionsBuilderSetProperties WithCredentials(NetworkCredential networkCredential);
         IFileSyncJobOptionsBuilderSetProperties WithSearchPattern(string searchPattern);
+        IFileSyncJobOptionsBuilderSetProperties WithSubfolder(string subfolder);
         IFileSyncJobOptionsBuilderSetProperties WithLogger(ILogger logger);
         IFileSyncJobOptionsBuilderSetProperties WithLogger(Action<string> loggerAction);
     }
