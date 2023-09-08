@@ -99,6 +99,10 @@ namespace FileSyncLibNet.SyncProviders
                         try
                         {
                             WriteFile(f.FullName, remotefile);
+                            if (JobOptions.DeleteSourceAfterBackup)
+                            {
+                                File.Delete(f.FullName);
+                            }
                         }
                         catch (Exception exc)
                         {
