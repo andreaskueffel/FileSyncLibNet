@@ -55,42 +55,60 @@ namespace FileSyncLibNet.SyncProviders
 
         public override void SyncSourceToDest()
         {
-            DirectoryInfo _di = new DirectoryInfo(JobOptions.SourcePath);
-            var _fi = _di.EnumerateFiles(
-                searchPattern: JobOptions.SearchPattern,
-                searchOption: JobOptions.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
             //Dateien ins Backup kopieren
             if (JobOptions.Credentials != null)
             {
                 ConnectToShare(Server, Share, JobOptions.Credentials.Domain, JobOptions.Credentials.UserName, JobOptions.Credentials.Password);
             }
-            if (JobOptions.SyncDeleted)
-            {
-                var remoteFiles = ListFiles(DestinationPath, true);
-                foreach (var file in remoteFiles)
-                {
-                    var realFilePath = file.Substring(file.IndexOf(DestinationPath) + DestinationPath.Length).Trim('\\').Replace('/', '\\');
-                    if (!_fi.Any(x => x.FullName.Replace('/', '\\').EndsWith(realFilePath)))
-                        DeleteFile(file);
-                }
-            }
-            foreach (FileInfo f in _fi)
-            {
-                bool copy = false;
-                var relativeFilename = f.FullName.Substring(Path.GetFullPath(JobOptions.SourcePath).Length);
-                var remotefile = Path.Combine(DestinationPath, relativeFilename.TrimStart('\\', '/')).Replace('/', '\\');
-                var exists = FileExists(remotefile, out long size);
-                copy = !exists || size != f.Length;
-                if (copy)
-                {
-                    logger.LogDebug("Copy {A}", relativeFilename);
-                    //File.Copy(f.FullName, remotefile.FullName, true);
-                    //CopyFileWithBuffer(f, remotefile);
-                    WriteFile(f.FullName, remotefile);
 
+            DirectoryInfo _di = new DirectoryInfo(JobOptions.SourcePath);
+
+            foreach (var dir in JobOptions.Subfolders.Count > 0 ? _di.GetDirectories() : new[] { _di })
+            {
+                if (JobOptions.Subfolders.Count > 0 && !JobOptions.Subfolders.Select(x => x.ToLower()).Contains(dir.Name.ToLower()))
+                    continue;
+
+
+
+                var _fi = dir.EnumerateFiles(
+                searchPattern: JobOptions.SearchPattern,
+                searchOption: JobOptions.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+                
+                if (JobOptions.SyncDeleted)
+                {
+                    var remoteFiles = ListFiles(DestinationPath, true);
+                    foreach (var file in remoteFiles)
+                    {
+                        var realFilePath = file.Substring(file.IndexOf(DestinationPath) + DestinationPath.Length).Trim('\\').Replace('/', '\\');
+                        if (!_fi.Any(x => x.FullName.Replace('/', '\\').EndsWith(realFilePath)))
+                            DeleteFile(file);
+                    }
                 }
-                else
-                    logger.LogDebug("Skip {A}", relativeFilename);
+                foreach (FileInfo f in _fi)
+                {
+                    bool copy = false;
+                    var relativeFilename = f.FullName.Substring(Path.GetFullPath(JobOptions.SourcePath).Length);
+                    var remotefile = Path.Combine(DestinationPath, relativeFilename.TrimStart('\\', '/')).Replace('/', '\\');
+                    var exists = FileExists(remotefile, out long size);
+                    copy = !exists || size != f.Length;
+                    if (copy)
+                    {
+                        logger.LogDebug("Copy {A}", relativeFilename);
+                        //File.Copy(f.FullName, remotefile.FullName, true);
+                        //CopyFileWithBuffer(f, remotefile);
+                        try
+                        {
+                            WriteFile(f.FullName, remotefile);
+                        }
+                        catch (Exception exc)
+                        {
+                            logger.LogError(exc, "Exception in WriteFile for {A}", relativeFilename);
+                        }
+
+                    }
+                    else
+                        logger.LogDebug("Skip {A}", relativeFilename);
+                }
             }
         }
 

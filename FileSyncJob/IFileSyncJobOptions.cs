@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Net;
 
 namespace FileSyncLibNet.FileSyncJob
@@ -13,6 +14,7 @@ namespace FileSyncLibNet.FileSyncJob
         ILogger Logger { get; set; }
         bool Recursive { get; set; }
         string SearchPattern { get; set; }
+        List<string> Subfolders { get; set; }
         string SourcePath { get; set; }
         bool SyncDeleted { get; set; }
     }
