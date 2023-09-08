@@ -16,6 +16,7 @@ namespace FileSyncLibNet.FileSyncJob
         string SearchPattern { get; set; }
         List<string> Subfolders { get; set; }
         string SourcePath { get; set; }
+        bool DeleteSourceAfterBackup { get; set; }
         bool SyncDeleted { get; set; }
     }
 }

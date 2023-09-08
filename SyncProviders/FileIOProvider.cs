@@ -55,6 +55,10 @@ namespace FileSyncLibNet.SyncProviders
                             logger.LogDebug("Copy {A}", relativeFilename);
                             File.Copy(f.FullName, remotefile.FullName, true);
                             copied++;
+                            if (JobOptions.DeleteSourceAfterBackup)
+                            {
+                                File.Delete(f.FullName);
+                            }
                         }
                         catch (Exception exc)
                         {

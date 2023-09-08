@@ -16,6 +16,7 @@ namespace FileSyncLibNet.FileSyncJob
         public List<string> Subfolders { get; set; }
         public bool Recursive { get; set; } = true;
         public bool SyncDeleted { get; set; } = false;
+        public bool DeleteSourceAfterBackup { get; set; } = false;
         public FileSyncProvider FileSyncProvider { get; set; } = FileSyncProvider.FileIO;
 
         public FileSyncJobOptions()
