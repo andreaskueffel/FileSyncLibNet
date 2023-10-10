@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using FileSyncLibNet.FileSyncJob;
 
-namespace FileSyncLibNet.FileSyncJob
+namespace FileSyncLibNet.Commons
 {
-    public interface IFileSyncJob
+    public interface IFileJob
     {
         void StartJob();
         void ExecuteNow();

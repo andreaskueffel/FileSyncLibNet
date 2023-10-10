@@ -2,14 +2,16 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
+using FileSyncLibNet.Commons;
 using FileSyncLibNet.FileSyncJob;
 
 namespace FileSyncLibNet.SyncProviders
 {
     internal interface ISyncProvider
     {
-        IFileSyncJobOptions JobOptions { get; set; }
+        IFileJobOptions JobOptions { get; }
         void SyncSourceToDest();
+        void DeleteFiles();
 
     }
 }

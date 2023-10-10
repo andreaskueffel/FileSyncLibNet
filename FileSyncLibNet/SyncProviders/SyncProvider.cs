@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace FileSyncLibNet.FileSyncJob
+namespace FileSyncLibNet.SyncProviders
 {
-    public enum FileSyncProvider
+    public enum SyncProvider
     {
         FileIO,
         SMBLib,

@@ -1,4 +1,5 @@
-﻿using FileSyncLibNet.FileSyncJob;
+﻿using FileSyncLibNet.Commons;
+using FileSyncLibNet.FileSyncJob;
 using Microsoft.Extensions.Logging;
 using SMBLibrary;
 using SMBLibrary.Client;
@@ -46,22 +47,26 @@ namespace FileSyncLibNet.SyncProviders
             }
         }
 
-        public SmbLibProvider(IFileSyncJobOptions options)
+        public SmbLibProvider(IFileJobOptions options):base(options)
         {
-            JobOptions = options;
-            Directory.CreateDirectory(JobOptions.SourcePath);
-            //Directory.CreateDirectory(JobOptions.DestinationPath);
-        }
 
+        }
+        public override void DeleteFiles()
+        {
+            throw new NotImplementedException();
+        }
         public override void SyncSourceToDest()
         {
+            if (!(JobOptions is IFileSyncJobOptions jobOptions))
+                throw new ArgumentException("this instance has no information about syncing files, it has type " + JobOptions.GetType().ToString());
+            Directory.CreateDirectory(jobOptions.SourcePath);
             //Dateien ins Backup kopieren
             if (JobOptions.Credentials != null)
             {
                 ConnectToShare(Server, Share, JobOptions.Credentials.Domain, JobOptions.Credentials.UserName, JobOptions.Credentials.Password);
             }
 
-            DirectoryInfo _di = new DirectoryInfo(JobOptions.SourcePath);
+            DirectoryInfo _di = new DirectoryInfo(jobOptions.SourcePath);
 
             foreach (var dir in JobOptions.Subfolders.Count > 0 ? _di.GetDirectories() : new[] { _di })
             {
@@ -74,7 +79,7 @@ namespace FileSyncLibNet.SyncProviders
                 searchPattern: JobOptions.SearchPattern,
                 searchOption: JobOptions.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
                 
-                if (JobOptions.SyncDeleted)
+                if (jobOptions.SyncDeleted)
                 {
                     var remoteFiles = ListFiles(DestinationPath, true);
                     foreach (var file in remoteFiles)
@@ -87,7 +92,7 @@ namespace FileSyncLibNet.SyncProviders
                 foreach (FileInfo f in _fi)
                 {
                     bool copy = false;
-                    var relativeFilename = f.FullName.Substring(Path.GetFullPath(JobOptions.SourcePath).Length);
+                    var relativeFilename = f.FullName.Substring(Path.GetFullPath(jobOptions.SourcePath).Length);
                     var remotefile = Path.Combine(DestinationPath, relativeFilename.TrimStart('\\', '/')).Replace('/', '\\');
                     var exists = FileExists(remotefile, out long size);
                     copy = !exists || size != f.Length;
@@ -99,7 +104,7 @@ namespace FileSyncLibNet.SyncProviders
                         try
                         {
                             WriteFile(f.FullName, remotefile);
-                            if (JobOptions.DeleteSourceAfterBackup)
+                            if (jobOptions.DeleteSourceAfterBackup)
                             {
                                 File.Delete(f.FullName);
                             }

@@ -1,4 +1,6 @@
-﻿using FileSyncLibNet.FileSyncJob;
+﻿using FileSyncLibNet.Commons;
+using FileSyncLibNet.FileCleanJob;
+using FileSyncLibNet.FileSyncJob;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -13,19 +15,21 @@ namespace FileSyncLibNet.SyncProviders
 {
     internal class FileIOProvider : ProviderBase
     {
-        public FileIOProvider(IFileSyncJobOptions options)
+        public FileIOProvider(IFileJobOptions options):base(options)
         {
-            JobOptions = options;
+            
         }
 
         public override void SyncSourceToDest()
         {
+            if (!(JobOptions is IFileSyncJobOptions jobOptions))
+                throw new ArgumentException("this instance has no information about syncing files, it has type " + JobOptions.GetType().ToString());
             var sw = Stopwatch.StartNew();
-            Directory.CreateDirectory(JobOptions.SourcePath);
+            Directory.CreateDirectory(jobOptions.SourcePath);
             Directory.CreateDirectory(JobOptions.DestinationPath);
             int copied = 0;
             int skipped = 0;
-            DirectoryInfo _di = new DirectoryInfo(JobOptions.SourcePath);
+            DirectoryInfo _di = new DirectoryInfo(jobOptions.SourcePath);
             //Dateien ins Backup kopieren
             if (JobOptions.Credentials != null)
             {
@@ -45,7 +49,7 @@ namespace FileSyncLibNet.SyncProviders
                 foreach (FileInfo f in _fi)
                 {
 
-                    var relativeFilename = f.FullName.Substring(Path.GetFullPath(JobOptions.SourcePath).Length).TrimStart('\\');
+                    var relativeFilename = f.FullName.Substring(Path.GetFullPath(jobOptions.SourcePath).Length).TrimStart('\\');
                     var remotefile = new FileInfo(Path.Combine(JobOptions.DestinationPath, relativeFilename));
                     bool copy = !remotefile.Exists || remotefile.Length != f.Length || remotefile.LastWriteTime != f.LastWriteTime;
                     if (copy)
@@ -55,7 +59,7 @@ namespace FileSyncLibNet.SyncProviders
                             logger.LogDebug("Copy {A}", relativeFilename);
                             File.Copy(f.FullName, remotefile.FullName, true);
                             copied++;
-                            if (JobOptions.DeleteSourceAfterBackup)
+                            if (jobOptions.DeleteSourceAfterBackup)
                             {
                                 File.Delete(f.FullName);
                             }
@@ -77,20 +81,74 @@ namespace FileSyncLibNet.SyncProviders
         }
 
 
-
-        void CopyFileWithBuffer(FileInfo source, FileInfo destination)
+        public override void DeleteFiles()
         {
-            using (var outstream = new FileStream(destination.FullName, FileMode.Create, FileAccess.Write, FileShare.None, 4096 * 20))
-            using (var instream = new FileStream(source.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096 * 20))
-            {
-                instream.CopyTo(outstream);
-            }
-            //destination.CreationTime = source.CreationTime;
-            //destination.LastAccessTime = source.LastAccessTime;
-            destination.LastWriteTime = source.LastWriteTime;
-            //destination.Attributes = source.Attributes;
+            if (!(JobOptions is IFileCleanJobOptions jobOptions))
+                throw new ArgumentException("this instance has no information about deleting files, it has type " + JobOptions.GetType().ToString());
 
+            try
+            {
+                var driveInfo = new DriveInfo(Path.GetFullPath(JobOptions.DestinationPath));
+                TimeSpan currentAge = jobOptions.MaxAge > TimeSpan.Zero ? jobOptions.MaxAge : TimeSpan.MaxValue;
+                TimeSpan step = jobOptions.Interval > TimeSpan.Zero ? jobOptions.Interval : TimeSpan.FromHours(1);
+                IEnumerable<string> paths ;
+                if (JobOptions.Subfolders.Count == 0)
+                    paths= new[] { (jobOptions.DestinationPath) };
+                else
+                    paths = JobOptions.Subfolders.Select(x => Path.Combine(JobOptions.DestinationPath, x));
+                
+                long minimumFreeSpace = Math.Max(2048, jobOptions.MinimumFreeSpaceMegabyte) * 1024L * 1024L;
+
+                int fileCount = 0;
+                
+                bool lowSpace = false;
+                while ((lowSpace = (driveInfo.AvailableFreeSpace < minimumFreeSpace && currentAge > JobOptions.Interval) || currentAge==jobOptions.MaxAge))
+                {
+                    List<FileInfo> filesToDelete = new List<FileInfo>();
+                    
+                    foreach (var pathMaxDay in paths)
+                    {
+                        try
+                        {
+                            if (!Directory.Exists(pathMaxDay))
+                                Directory.CreateDirectory(pathMaxDay);
+                            DirectoryInfo di = new DirectoryInfo(pathMaxDay);
+                            FileInfo[] fi = di.GetFiles();
+                            foreach (FileInfo f in fi)
+                            {
+                                if (f.LastWriteTime < (DateTime.Now - currentAge))
+                                {
+                                    filesToDelete.Add(f);
+                                }
+                            }
+                        }
+                        catch (Exception ex) { logger.LogError(ex, "exception getting file information of {A}", pathMaxDay); }
+                    }
+                    if (filesToDelete.Count > 0)
+                        logger.LogWarning("free space on drive {A} {B} MB is below limit of {C} MB. Deleting {D} files older than {E}", driveInfo.RootDirectory, (driveInfo.AvailableFreeSpace / 1024L / 1024L), (minimumFreeSpace / 1024L / 1024L), filesToDelete.Count, currentAge);
+                    //else
+                    //    log.LogDebug("free space on drive {A} {B} MB is below limit of {C} MB. No files older than {D} found", driveInfo.RootDirectory, (driveInfo.AvailableFreeSpace / 1024L / 1024L), (minimumFreeSpace / 1024L / 1024L), timeDiff);
+                    foreach (var file in filesToDelete)
+                    {
+                        logger.LogDebug("deleting file {A}", file.FullName);
+
+                        try
+                        {
+                            file.Delete();
+                            fileCount++;
+                        }
+                        catch (Exception ex) { logger.LogError(ex, "exception deleting file {A}", file.FullName); }
+                    }
+                    currentAge -= step;
+
+                }
+            }
+            catch (Exception exc)
+            {
+                logger.LogError(exc, "TimerCleanup_Tick threw an exception");
+            }
         }
+        
         void EnsureAccess()
         {
             //#region Backup

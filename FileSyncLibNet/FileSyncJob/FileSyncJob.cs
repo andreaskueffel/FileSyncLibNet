@@ -1,4 +1,6 @@
-﻿using FileSyncLibNet.SyncProviders;
+﻿using FileSyncLibNet.Commons;
+using FileSyncLibNet.FileCleanJob;
+using FileSyncLibNet.SyncProviders;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
@@ -6,37 +8,37 @@ using System.Threading.Tasks;
 
 namespace FileSyncLibNet.FileSyncJob
 {
-    public class FileSyncJob : IFileSyncJob
+    public class FileSyncJob : IFileJob
     {
-        public string JobName { get { return $"Source: {options.SourcePath} Destination: {options.DestinationPath} ({options.Interval})"; } }
+        public string JobName { get { return $"Type: {options.GetType()} Destination: {options.DestinationPath} ({options.Interval})"; } }
         public event EventHandler<FileSyncJobEventArgs> JobStarted;
         public event EventHandler<FileSyncJobEventArgs> JobFinished;
         public event EventHandler<FileSyncJobEventArgs> JobError;
-        private readonly IFileSyncJobOptions options;
+        private readonly IFileJobOptions options;
         private readonly Timer timer;
         private readonly ISyncProvider syncProvider;
         private volatile bool v_jobRunning = false;
 
-        private FileSyncJob(IFileSyncJobOptions fileSyncJobOptions)
+        private FileSyncJob(IFileJobOptions fileSyncJobOptions)
         {
             options = fileSyncJobOptions;
             timer = new Timer(TimerElapsed);
             switch (options.FileSyncProvider)
             {
                 default:
-                case FileSyncProvider.FileIO:
+                case SyncProvider.FileIO:
                     syncProvider = new FileIOProvider(fileSyncJobOptions);
                     break;
-                case FileSyncProvider.SMBLib:
+                case SyncProvider.SMBLib:
                     syncProvider = new SmbLibProvider(fileSyncJobOptions);
                     break;
-                case FileSyncProvider.Robocopy:
+                case SyncProvider.Robocopy:
                     syncProvider = new RoboCopyProvider(fileSyncJobOptions);
                     break;
             }
         }
 
-        public static IFileSyncJob CreateJob(IFileSyncJobOptions fileSyncJobOptions)
+        public static IFileJob CreateJob(IFileJobOptions fileSyncJobOptions)
         {
             return new FileSyncJob(fileSyncJobOptions);
         }
@@ -84,7 +86,12 @@ namespace FileSyncLibNet.FileSyncJob
             {
                 //True Job Code
                 options.Logger.LogDebug("start job {0}", JobName);
-                syncProvider.SyncSourceToDest();
+                if (options is IFileSyncJobOptions)
+                    syncProvider.SyncSourceToDest();
+                else if (options is IFileCleanJobOptions)
+                    syncProvider.DeleteFiles();
+                else
+                    throw new NotImplementedException($"job with options type {options.GetType()}");
                 options.Logger.LogDebug("end job {0}", JobName);
             }
             catch (Exception exc)
