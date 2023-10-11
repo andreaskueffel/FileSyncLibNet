@@ -27,27 +27,34 @@ namespace FileSyncApp
             {
                 var cleanJob = FileCleanJobOptionsBuilder.CreateBuilder()
                    .WithDestinationPath("temp")
-                   .WithInterval(TimeSpan.FromMinutes(20))
-                   .WithMaxAge(TimeSpan.FromDays(500))
+                   .WithInterval(TimeSpan.FromMinutes(21))
+                   .WithMaxAge(TimeSpan.FromDays(30))
                    .WithMinimumFreeSpaceMegabytes(1024 * 30)
                    .Build();
                 jobOptions.Add("CleanJob", cleanJob);
 
-                var syncJobOption = FileSyncJobOptionsBuilder.CreateBuilder()
+                var syncFromEdgeToLocal = FileSyncJobOptionsBuilder.CreateBuilder()
                     .WithSourcePath("\\\\192.168.214.240\\share\\hri\\production")
                     .WithDestinationPath("temp")
                     .WithFileSyncProvider(SyncProvider.SMBLib)
-
+                    .WithSubfolder("left")
+                    .WithSubfolder("right")
                     .WithCredentials(new System.Net.NetworkCredential("USER", "Password", ""))
-                    .WithInterval(TimeSpan.FromMinutes(15))
-                    /*
-                    .WithSearchPattern("*.*")
-                    */
+                    .WithInterval(TimeSpan.FromMinutes(10)+TimeSpan.FromSeconds(25))
                     .SyncRecursive(true)
-                    
                     .Build();
-                jobOptions.Add("SyncJob", syncJobOption);
+                jobOptions.Add("SyncFromEdgeToLocal", syncFromEdgeToLocal);
                 
+                var syncFromLocalToRemote = FileSyncJobOptionsBuilder.CreateBuilder()
+                    .WithSourcePath("temp")
+                    .WithDestinationPath("Z:\\Serienspektren_Import\\53600002")
+                    .WithFileSyncProvider(SyncProvider.FileIO)
+                    .WithInterval(TimeSpan.FromMinutes(15))
+                    .DeleteAfterBackup(false) //sonst werden die Daten wieder neu von der Edge geholt
+                    .SyncRecursive(true)
+                    .Build();
+                jobOptions.Add("SyncFromLocalToRemote", syncFromLocalToRemote);
+
                 var json = JsonConvert.SerializeObject(jobOptions, Formatting.Indented, jsonSettings);
                 File.WriteAllText("config.json", json);
             }
