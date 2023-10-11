@@ -135,8 +135,10 @@ namespace FileSyncLibNet.SyncProviders
                     throw new ArgumentNullException("Credentials are not set - cannot connect to share");
                 }
 
+                Directory.CreateDirectory(jobOptions.DestinationPath);
+                foreach(var subfolder in jobOptions.Subfolders)
+                    Directory.CreateDirectory(Path.Combine(jobOptions.DestinationPath, subfolder));
                 DirectoryInfo _di = new DirectoryInfo(jobOptions.DestinationPath);
-
                 foreach (var dir in JobOptions.Subfolders.Count > 0 ? _di.GetDirectories() : new[] { _di })
                 {
                     if (JobOptions.Subfolders.Count > 0 && !JobOptions.Subfolders.Select(x => x.ToLower()).Contains(dir.Name.ToLower()))
@@ -147,7 +149,7 @@ namespace FileSyncLibNet.SyncProviders
                     searchPattern: JobOptions.SearchPattern,
                     searchOption: JobOptions.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 
-                    var remoteFiles = ListFiles(SourcePath, true);
+                    var remoteFiles = ListFiles(Path.Combine(SourcePath, dir.Name), JobOptions.Recursive);
                     if (jobOptions.SyncDeleted)
                     {
                         foreach (var file in remoteFiles)
@@ -318,6 +320,8 @@ namespace FileSyncLibNet.SyncProviders
                 status = fileStore.CloseFile(fileHandle);
             }
             localFileStream.Dispose();
+            var fileInfo = new FileInfo(localFilePath);
+            SetFileAttributes(remoteFilePath, fileInfo.LastWriteTime, fileInfo.CreationTime, fileInfo.LastWriteTime, fileInfo.LastAccessTime);
 
         }
         void DeleteFile(string filePath)
