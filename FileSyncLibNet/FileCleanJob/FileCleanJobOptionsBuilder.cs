@@ -92,7 +92,7 @@ namespace FileSyncLibNet.FileCleanJob
             jobOptions.Logger = new StringLogger(loggerAction);
             return this;
         }
-        public IFileJobOptions Build()
+        public IFileCleanJobOptions Build()
         {
             if (null == jobOptions.Logger)
                 jobOptions.Logger = new StringLogger((x) => { });
@@ -131,7 +131,7 @@ namespace FileSyncLibNet.FileCleanJob
 
     public interface IFileCleanJobOptionsBuilderCanBuild
     {
-        IFileJobOptions Build();
+        IFileCleanJobOptions Build();
         IFileJob BuildJob();
     }
 
