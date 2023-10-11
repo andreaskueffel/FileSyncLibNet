@@ -15,39 +15,12 @@ namespace FileSyncLibNet.SyncProviders
     {
         SMB2Client client;
         ISMBFileStore fileStore;
-        string Server
-        {
-            get
-            {
-                if (JobOptions.DestinationPath.StartsWith("smb://", StringComparison.OrdinalIgnoreCase)) //Linux syntax
-                {
-                    //Pattern smb://ServerName/ShareName/Folder1/Folder2
-                    return JobOptions.DestinationPath.Substring(1);
-                }
-                else
-                {
-                    //Pattern \\ServerName\ShareName\Folder1\Folder2
-                    return (JobOptions.DestinationPath.StartsWith("\\\\") ? JobOptions.DestinationPath.Substring(2) : JobOptions.DestinationPath).Split('\\')[0];
-                }
-            }
-        }
-        string Share
-        {
-            get
-            {
-                var remainingDestination = JobOptions.DestinationPath.Substring(JobOptions.DestinationPath.IndexOf(Server) + Server.Length);
-                return remainingDestination.Trim('/', '\\').Split('/', '\\')[0];
-            }
-        }
-        string DestinationPath
-        {
-            get
-            {
-                return JobOptions.DestinationPath.Substring(JobOptions.DestinationPath.IndexOf(Share) + Share.Length).Replace('/', '\\');
-            }
-        }
 
-        public SmbLibProvider(IFileJobOptions options):base(options)
+
+
+
+
+        public SmbLibProvider(IFileJobOptions options) : base(options)
         {
 
         }
@@ -59,65 +32,164 @@ namespace FileSyncLibNet.SyncProviders
         {
             if (!(JobOptions is IFileSyncJobOptions jobOptions))
                 throw new ArgumentException("this instance has no information about syncing files, it has type " + JobOptions.GetType().ToString());
-            Directory.CreateDirectory(jobOptions.SourcePath);
-            //Dateien ins Backup kopieren
-            if (JobOptions.Credentials != null)
+
+            //Determine if source or destination is network path
+            bool sourceIsNetShare = jobOptions.SourcePath.StartsWith("\\\\");
+            bool destIsNetShare = jobOptions.DestinationPath.StartsWith("\\\\");
+            if (sourceIsNetShare && destIsNetShare)
+                throw new NotImplementedException("both source and destination are network shares - this is not supported yet");
+
+            if (!sourceIsNetShare && !destIsNetShare)
+                throw new Exception("neither source or destination are network share paths - unable to handle with SmbLibProvider");
+
+            if (!sourceIsNetShare && destIsNetShare)
             {
-                ConnectToShare(Server, Share, JobOptions.Credentials.Domain, JobOptions.Credentials.UserName, JobOptions.Credentials.Password);
-            }
+                Directory.CreateDirectory(jobOptions.SourcePath);
 
-            DirectoryInfo _di = new DirectoryInfo(jobOptions.SourcePath);
+                string DestinationServer = JobOptions.DestinationPath.StartsWith("smb://", StringComparison.OrdinalIgnoreCase) ?
+                    JobOptions.DestinationPath.Substring(1) :
+                    (JobOptions.DestinationPath.StartsWith("\\\\") ? JobOptions.DestinationPath.Substring(2) : JobOptions.DestinationPath).Split('\\')[0];
 
-            foreach (var dir in JobOptions.Subfolders.Count > 0 ? _di.GetDirectories() : new[] { _di })
-            {
-                if (JobOptions.Subfolders.Count > 0 && !JobOptions.Subfolders.Select(x => x.ToLower()).Contains(dir.Name.ToLower()))
-                    continue;
-
+                string DestinationShare = JobOptions.DestinationPath.Substring(JobOptions.DestinationPath.IndexOf(DestinationServer) + DestinationServer.Length).Trim('/', '\\').Split('/', '\\')[0];
+                string DestinationPath = JobOptions.DestinationPath.Substring(JobOptions.DestinationPath.IndexOf(DestinationShare) + DestinationShare.Length).Replace('/', '\\');
 
 
-                var _fi = dir.EnumerateFiles(
-                searchPattern: JobOptions.SearchPattern,
-                searchOption: JobOptions.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
-                
-                if (jobOptions.SyncDeleted)
+
+
+                //Dateien ins Backup kopieren
+                if (JobOptions.Credentials != null)
                 {
-                    var remoteFiles = ListFiles(DestinationPath, true);
-                    foreach (var file in remoteFiles)
-                    {
-                        var realFilePath = file.Substring(file.IndexOf(DestinationPath) + DestinationPath.Length).Trim('\\').Replace('/', '\\');
-                        if (!_fi.Any(x => x.FullName.Replace('/', '\\').EndsWith(realFilePath)))
-                            DeleteFile(file);
-                    }
+                    ConnectToShare(DestinationServer, DestinationShare, JobOptions.Credentials.Domain, JobOptions.Credentials.UserName, JobOptions.Credentials.Password);
                 }
-                foreach (FileInfo f in _fi)
+                else
                 {
-                    bool copy = false;
-                    var relativeFilename = f.FullName.Substring(Path.GetFullPath(jobOptions.SourcePath).Length);
-                    var remotefile = Path.Combine(DestinationPath, relativeFilename.TrimStart('\\', '/')).Replace('/', '\\');
-                    var exists = FileExists(remotefile, out long size);
-                    copy = !exists || size != f.Length;
-                    if (copy)
+                    throw new ArgumentNullException("Credentials are not set - cannot connect to share");
+                }
+
+                DirectoryInfo _di = new DirectoryInfo(jobOptions.SourcePath);
+
+                foreach (var dir in JobOptions.Subfolders.Count > 0 ? _di.GetDirectories() : new[] { _di })
+                {
+                    if (JobOptions.Subfolders.Count > 0 && !JobOptions.Subfolders.Select(x => x.ToLower()).Contains(dir.Name.ToLower()))
+                        continue;
+
+
+                    var _fi = dir.EnumerateFiles(
+                    searchPattern: JobOptions.SearchPattern,
+                    searchOption: JobOptions.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+
+                    if (jobOptions.SyncDeleted)
                     {
-                        logger.LogDebug("Copy {A}", relativeFilename);
-                        //File.Copy(f.FullName, remotefile.FullName, true);
-                        //CopyFileWithBuffer(f, remotefile);
-                        try
+                        var remoteFiles = ListFiles(DestinationPath, true);
+                        foreach (var file in remoteFiles)
                         {
-                            WriteFile(f.FullName, remotefile);
-                            if (jobOptions.DeleteSourceAfterBackup)
+                            var realFilePath = file.Substring(file.IndexOf(DestinationPath) + DestinationPath.Length).Trim('\\').Replace('/', '\\');
+                            if (!_fi.Any(x => x.FullName.Replace('/', '\\').EndsWith(realFilePath)))
+                                DeleteFile(file);
+                        }
+                    }
+                    foreach (FileInfo f in _fi)
+                    {
+                        bool copy = false;
+                        var relativeFilename = f.FullName.Substring(Path.GetFullPath(jobOptions.SourcePath).Length);
+                        var remotefile = Path.Combine(DestinationPath, relativeFilename.TrimStart('\\', '/')).Replace('/', '\\');
+                        var exists = FileExists(remotefile, out long size);
+                        copy = !exists || size != f.Length;
+                        if (copy)
+                        {
+                            logger.LogDebug("Copy {A}", relativeFilename);
+                            try
                             {
-                                File.Delete(f.FullName);
+                                WriteFile(f.FullName, remotefile);
+                                if (jobOptions.DeleteSourceAfterBackup)
+                                {
+                                    File.Delete(f.FullName);
+                                }
                             }
-                        }
-                        catch (Exception exc)
-                        {
-                            logger.LogError(exc, "Exception in WriteFile for {A}", relativeFilename);
-                        }
+                            catch (Exception exc)
+                            {
+                                logger.LogError(exc, "Exception in WriteFile for {A}", relativeFilename);
+                            }
 
+                        }
+                        else
+                            logger.LogDebug("Skip {A}", relativeFilename);
                     }
-                    else
-                        logger.LogDebug("Skip {A}", relativeFilename);
                 }
+            }
+            else //(sourceIsNetShare && !destIsNetShare)
+            {
+                string SourceServer = jobOptions.SourcePath.StartsWith("smb://", StringComparison.OrdinalIgnoreCase) ?
+                   jobOptions.SourcePath.Substring(1) :
+                   (jobOptions.SourcePath.StartsWith("\\\\") ? jobOptions.SourcePath.Substring(2) : jobOptions.SourcePath).Split('\\')[0];
+
+                string SourceShare = jobOptions.SourcePath.Substring(jobOptions.SourcePath.IndexOf(SourceServer) + SourceServer.Length).Trim('/', '\\').Split('/', '\\')[0];
+                string SourcePath = jobOptions.SourcePath.Substring(jobOptions.SourcePath.IndexOf(SourceShare) + SourceShare.Length).Replace('/', '\\');
+
+                if (JobOptions.Credentials != null)
+                {
+                    ConnectToShare(SourceServer, SourceShare, JobOptions.Credentials.Domain, JobOptions.Credentials.UserName, JobOptions.Credentials.Password);
+                }
+                else
+                {
+                    throw new ArgumentNullException("Credentials are not set - cannot connect to share");
+                }
+
+                DirectoryInfo _di = new DirectoryInfo(jobOptions.DestinationPath);
+
+                foreach (var dir in JobOptions.Subfolders.Count > 0 ? _di.GetDirectories() : new[] { _di })
+                {
+                    if (JobOptions.Subfolders.Count > 0 && !JobOptions.Subfolders.Select(x => x.ToLower()).Contains(dir.Name.ToLower()))
+                        continue;
+
+
+                    var _fi = dir.EnumerateFiles(
+                    searchPattern: JobOptions.SearchPattern,
+                    searchOption: JobOptions.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+
+                    var remoteFiles = ListFiles(SourcePath, true);
+                    if (jobOptions.SyncDeleted)
+                    {
+                        foreach (var file in remoteFiles)
+                        {
+                            var realFilePath = file.Substring(file.IndexOf(SourcePath) + SourcePath.Length).Trim('\\').Replace('/', '\\');
+                            if (!_fi.Any(x => x.FullName.Replace('/', '\\').EndsWith(realFilePath)))
+                                File.Delete(file);
+                        }
+                    }
+                    foreach (var remoteFile in remoteFiles)
+                    {
+                        bool copy = false;
+                        var realFilePath = remoteFile.Substring(remoteFile.IndexOf(SourcePath) + SourcePath.Length).Trim('\\').Replace('/', '\\');
+                        
+                        var localFile = Path.Combine(jobOptions.DestinationPath, realFilePath.TrimStart('\\', '/')).Replace('/', '\\');
+                        var exists = File.Exists(localFile);
+                        _ = FileExists(remoteFile, out long remoteSize);
+                        var size = exists ? new FileInfo(localFile).Length : 0;
+                        copy = !exists || size != remoteSize;
+                        if (copy)
+                        {
+                            logger.LogDebug("Copy {A}", realFilePath);
+                            try
+                            {
+                                ReadFile(remoteFile, localFile);
+                                if (jobOptions.DeleteSourceAfterBackup)
+                                {
+                                    DeleteFile(remoteFile);
+                                }
+                            }
+                            catch (Exception exc)
+                            {
+                                logger.LogError(exc, "Exception in ReadFile for {A}", realFilePath);
+                            }
+
+                        }
+                        else
+                            logger.LogDebug("Skip {A}", realFilePath);
+                    }
+                }
+
+
             }
         }
 
@@ -133,7 +205,7 @@ namespace FileSyncLibNet.SyncProviders
             bool isConnected = client.Connect(server, SMBTransportType.DirectTCPTransport);
             if (isConnected)
             {
-                logger.LogDebug("ConnectToShare with domain {A} and user {B} with {C} pass", domain, user, password.Select(x=>'*'));
+                logger.LogDebug("ConnectToShare with domain {A} and user {B} with {C} pass", domain, user, password.Select(x => '*'));
                 status = client.Login(domain, user, password);
                 if (status == NTStatus.STATUS_SUCCESS)
                 {
@@ -159,6 +231,45 @@ namespace FileSyncLibNet.SyncProviders
         public void Dispose()
         {
             fileStore?.Disconnect();
+        }
+
+        public void ReadFile(string remoteFilePath, string localFilePath)
+        {
+            object fileHandle;
+            FileStatus fileStatus;
+
+            var status = fileStore.CreateFile(out fileHandle, out fileStatus, remoteFilePath, AccessMask.GENERIC_READ | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.Read, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE | CreateOptions.FILE_SYNCHRONOUS_IO_ALERT, null);
+
+            if (status == NTStatus.STATUS_SUCCESS)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(localFilePath));
+                var stream = File.Open(localFilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
+                byte[] data;
+                long bytesRead = 0;
+                while (true)
+                {
+                    status = fileStore.ReadFile(out data, fileHandle, bytesRead, (int)client.MaxReadSize);
+                    if (status != NTStatus.STATUS_SUCCESS && status != NTStatus.STATUS_END_OF_FILE)
+                    {
+                        throw new Exception("Failed to read from file");
+                    }
+
+                    if (status == NTStatus.STATUS_END_OF_FILE || data.Length == 0)
+                    {
+                        break;
+                    }
+                    bytesRead += data.Length;
+                    stream.Write(data, 0, data.Length);
+                }
+                stream.Close();
+            }
+            if (fileHandle != null)
+                status = fileStore.CloseFile(fileHandle);
+            var fileInfo = new FileInfo(localFilePath);
+            GetFileAttributes(remoteFilePath, out DateTime lastWriteTime, out DateTime creationTime, out _, out DateTime lastAccessTime);
+            fileInfo.LastWriteTime = lastWriteTime;
+            fileInfo.CreationTime = creationTime;
+            fileInfo.LastAccessTime = lastAccessTime;
         }
 
         public void WriteFile(string localFilePath, string remoteFilePath)
@@ -281,6 +392,46 @@ namespace FileSyncLibNet.SyncProviders
             }
             size = 0;
             return false;
+
+        }
+        void SetFileAttributes(string filepathFromShare, DateTime lastWriteTime, DateTime createTime, DateTime modifiedTime, DateTime accessTime)
+        {
+            object directoryHandle;
+            FileStatus fileStatus;
+            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, filepathFromShare.Trim('\\'), AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE, null);
+            if (status == NTStatus.STATUS_SUCCESS)
+            {
+                
+                status = fileStore.GetFileInformation(out FileInformation result, directoryHandle, FileInformationClass.FileBasicInformation);
+                (result as FileBasicInformation).LastWriteTime=lastWriteTime;
+                (result as FileBasicInformation).CreationTime=createTime;
+                (result as FileBasicInformation).ChangeTime=modifiedTime;
+                (result as FileBasicInformation).LastAccessTime=accessTime;
+                status = fileStore.SetFileInformation(directoryHandle, result);
+                status = fileStore.CloseFile(directoryHandle);
+            }
+            throw new Exception("unable to set attributes - status " + status);
+
+        }
+        void GetFileAttributes(string filepathFromShare, out DateTime lastWriteTime, out DateTime createTime, out DateTime modifiedTime, out DateTime accessTime)
+        {
+            object directoryHandle;
+            FileStatus fileStatus;
+            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, filepathFromShare.Trim('\\'), AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE, null);
+            if (status == NTStatus.STATUS_SUCCESS)
+            {
+
+                status = fileStore.GetFileInformation(out FileInformation result, directoryHandle, FileInformationClass.FileBasicInformation);
+                lastWriteTime = (result as FileBasicInformation).LastWriteTime.Time.Value;
+                modifiedTime = (result as FileBasicInformation).ChangeTime.Time.Value;
+                createTime = (result as FileBasicInformation).CreationTime.Time.Value;
+                accessTime = (result as FileBasicInformation).LastAccessTime.Time.Value;
+                status = fileStore.CloseFile(directoryHandle);
+            }
+            else
+            {
+                throw new Exception("unable to set attributes - status " + status);
+            }
 
         }
 
