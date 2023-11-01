@@ -17,9 +17,9 @@
     <PackageReference Include="SMBLibrary" Version="1.5.0.1" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="..\README.md">
+    <Content Include="../README.md">
       <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
+      <PackagePath>README.md</PackagePath>
+    </Content>
   </ItemGroup>
 </Project>
