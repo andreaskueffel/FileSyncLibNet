@@ -57,6 +57,7 @@ namespace FileSyncLibNet.SyncProviders
                         try
                         {
                             logger.LogDebug("Copy {A}", relativeFilename);
+                            Directory.CreateDirectory(Path.GetDirectoryName(remotefile.FullName));
                             File.Copy(f.FullName, remotefile.FullName, true);
                             copied++;
                             if (jobOptions.DeleteSourceAfterBackup)
