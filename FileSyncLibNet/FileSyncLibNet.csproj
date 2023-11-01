@@ -12,14 +12,14 @@
 	<Description>A library to easily backup or sync 2 folders either once or in a given interval.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.0" />
-    <PackageReference Include="RoboSharp" Version="1.2.8" />
-    <PackageReference Include="SMBLibrary" Version="1.5.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
+    <PackageReference Include="RoboSharp" Version="1.3.0" />
+    <PackageReference Include="SMBLibrary" Version="1.5.0.1" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="README.md">
+    <Content Include="../README.md">
       <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
+      <PackagePath>README.md</PackagePath>
+    </Content>
   </ItemGroup>
 </Project>

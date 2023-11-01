@@ -1,4 +1,6 @@
-﻿using FileSyncLibNet.Logger;
+﻿using FileSyncLibNet.Commons;
+using FileSyncLibNet.Logger;
+using FileSyncLibNet.SyncProviders;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Net;
@@ -34,7 +36,7 @@ namespace FileSyncLibNet.FileSyncJob
             jobOptions.DestinationPath = path;
             return this;
         }
-        public IFileSyncJobOptionsBuilderSetProperties WithFileSyncProvider(FileSyncProvider provider)
+        public IFileSyncJobOptionsBuilderSetProperties WithFileSyncProvider(SyncProvider provider)
         {
             jobOptions.FileSyncProvider = provider;
             return this;
@@ -100,7 +102,7 @@ namespace FileSyncLibNet.FileSyncJob
                 jobOptions.Logger = new StringLogger((x) => { });
             return jobOptions;
         }
-        public IFileSyncJob BuildJob()
+        public IFileJob BuildJob()
         {
             return FileSyncJob.CreateJob(Build());
         }
@@ -117,7 +119,7 @@ namespace FileSyncLibNet.FileSyncJob
     }
     public interface IFileSyncJobOptionsBuilderSetProvider
     {
-        IFileSyncJobOptionsBuilderSetProperties WithFileSyncProvider(FileSyncProvider provider);
+        IFileSyncJobOptionsBuilderSetProperties WithFileSyncProvider(SyncProvider provider);
     }
 
     public interface IFileSyncJobOptionsBuilderSetProperties : IFileSyncJobOptionsBuilderSetProvider, IFileSyncJobOptionsBuilderCanBuild
@@ -137,7 +139,7 @@ namespace FileSyncLibNet.FileSyncJob
     public interface IFileSyncJobOptionsBuilderCanBuild
     {
         IFileSyncJobOptions Build();
-        IFileSyncJob BuildJob();
+        IFileJob BuildJob();
     }
 
 }

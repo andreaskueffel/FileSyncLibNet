@@ -1,6 +1,8 @@
-﻿using FileSyncLibNet.FileSyncJob;
+﻿using FileSyncLibNet.Commons;
+using FileSyncLibNet.FileSyncJob;
 using Microsoft.Extensions.Logging;
 using RoboSharp;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -11,12 +13,15 @@ namespace FileSyncLibNet.SyncProviders
     internal class RoboCopyProvider : ProviderBase
     {
 
-        public RoboCopyProvider(IFileSyncJobOptions options)
+        public RoboCopyProvider(IFileJobOptions options) : base(options)
         {
-            JobOptions = options;
+
         }
         public override void SyncSourceToDest()
         {
+            if (!(JobOptions is IFileSyncJobOptions jobOptions))
+                throw new ArgumentException("this instance has no information about syncing files, it has type " + JobOptions.GetType().ToString());
+
             //Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance)
             RoboCommand backup = new RoboCommand();
             // events
@@ -24,10 +29,10 @@ namespace FileSyncLibNet.SyncProviders
             backup.OnCommandCompleted += (s, e) => { logger.LogDebug("ROBOCOPY: Command completed"); };
 
             // copy options
-            backup.CopyOptions.Source = Path.GetFullPath(JobOptions.SourcePath);
+            backup.CopyOptions.Source = Path.GetFullPath(jobOptions.SourcePath);
             backup.CopyOptions.Destination = JobOptions.DestinationPath;
             backup.CopyOptions.CopySubdirectories = JobOptions.Recursive;
-            backup.CopyOptions.Purge = JobOptions.SyncDeleted;
+            backup.CopyOptions.Purge = jobOptions.SyncDeleted;
             backup.CopyOptions.FileFilter = new List<string>() { JobOptions.SearchPattern };
             //backup.CopyOptions.UseUnbufferedIo = true;
             backup.CopyOptions.MultiThreadedCopiesCount = System.Environment.ProcessorCount;
@@ -46,6 +51,11 @@ namespace FileSyncLibNet.SyncProviders
                 backupTask = backup.Start();
             }
             Task.WaitAll(backupTask);
+        }
+
+        public override void DeleteFiles()
+        {
+            throw new NotImplementedException();
         }
 
     }

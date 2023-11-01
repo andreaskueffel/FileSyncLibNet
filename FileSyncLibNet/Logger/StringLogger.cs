@@ -3,7 +3,7 @@ using System;
 
 namespace FileSyncLibNet.Logger
 {
-    internal class StringLogger : ILogger
+    public class StringLogger : ILogger
     {
         public LogLevel MinimumLogLevel { get; set; }
 

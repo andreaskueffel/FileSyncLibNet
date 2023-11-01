@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using FileSyncLibNet.Commons;
 
 namespace FileSyncLibNet.FileSyncJob
 {
@@ -12,7 +13,7 @@ namespace FileSyncLibNet.FileSyncJob
 
         }
 
-        public IFileSyncJob Build()
+        public IFileJob Build()
         {
             return FileSyncJob.CreateJob(optionsBuilder.Build());
         }
@@ -28,6 +29,6 @@ namespace FileSyncLibNet.FileSyncJob
     }
     public interface ICanBuild
     {
-        IFileSyncJob Build();
+        IFileJob Build();
     }
 }
