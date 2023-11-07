@@ -85,14 +85,14 @@ namespace FileSyncLibNet.FileSyncJob
             try
             {
                 //True Job Code
-                options.Logger.LogDebug("start job {0}", JobName);
+                options.Logger.LogInformation("start job {0}", JobName);
                 if (options is IFileSyncJobOptions)
                     syncProvider.SyncSourceToDest();
                 else if (options is IFileCleanJobOptions)
                     syncProvider.DeleteFiles();
                 else
                     throw new NotImplementedException($"job with options type {options.GetType()}");
-                options.Logger.LogDebug("end job {0}", JobName);
+                options.Logger.LogInformation("end job {0}", JobName);
             }
             catch (Exception exc)
             {
