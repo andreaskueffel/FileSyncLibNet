@@ -5,6 +5,7 @@ using SMBLibrary;
 using SMBLibrary.Client;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using FileAttributes = SMBLibrary.FileAttributes;
@@ -32,7 +33,9 @@ namespace FileSyncLibNet.SyncProviders
         {
             if (!(JobOptions is IFileSyncJobOptions jobOptions))
                 throw new ArgumentException("this instance has no information about syncing files, it has type " + JobOptions.GetType().ToString());
-
+            var sw = Stopwatch.StartNew();
+            int copied = 0;
+            int skipped = 0;
             //Determine if source or destination is network path
             bool sourceIsNetShare = jobOptions.SourcePath.StartsWith("\\\\");
             bool destIsNetShare = jobOptions.DestinationPath.StartsWith("\\\\");
@@ -78,9 +81,14 @@ namespace FileSyncLibNet.SyncProviders
                     searchPattern: JobOptions.SearchPattern,
                     searchOption: JobOptions.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 
+                    if (jobOptions.RememberLastSync)
+                    {
+                        _fi = _fi.Where(x => x.LastWriteTime > (LastRun - jobOptions.Interval));
+                        LastRun = DateTimeOffset.Now;
+                    }
                     if (jobOptions.SyncDeleted)
                     {
-                        var remoteFiles = ListFiles(DestinationPath, true);
+                        var remoteFiles = ListFiles(DestinationPath, true, jobOptions.RememberLastSync ? LastRun - jobOptions.Interval : DateTime.MinValue, out _);
                         foreach (var file in remoteFiles)
                         {
                             var realFilePath = file.Substring(file.IndexOf(DestinationPath) + DestinationPath.Length).Trim('\\').Replace('/', '\\');
@@ -101,6 +109,7 @@ namespace FileSyncLibNet.SyncProviders
                             try
                             {
                                 WriteFile(f.FullName, remotefile);
+                                copied++;
                                 if (jobOptions.DeleteSourceAfterBackup)
                                 {
                                     File.Delete(f.FullName);
@@ -113,7 +122,10 @@ namespace FileSyncLibNet.SyncProviders
 
                         }
                         else
+                        {
                             logger.LogDebug("Skip {A}", relativeFilename);
+                            skipped++;
+                        }
                     }
                 }
             }
@@ -149,7 +161,9 @@ namespace FileSyncLibNet.SyncProviders
                     searchPattern: JobOptions.SearchPattern,
                     searchOption: JobOptions.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 
-                    var remoteFiles = ListFiles(Path.Combine(SourcePath, dir.Name), JobOptions.Recursive);
+                    var remoteFiles = ListFiles(Path.Combine(SourcePath, dir.Name), JobOptions.Recursive, jobOptions.RememberLastSync ? LastRun - jobOptions.Interval : DateTime.MinValue, out int skippedByTimestamp);
+                    skipped += skippedByTimestamp;
+                    LastRun = DateTimeOffset.Now;
                     if (jobOptions.SyncDeleted)
                     {
                         foreach (var file in remoteFiles)
@@ -175,6 +189,7 @@ namespace FileSyncLibNet.SyncProviders
                             try
                             {
                                 ReadFile(remoteFile, localFile);
+                                copied++;
                                 if (jobOptions.DeleteSourceAfterBackup)
                                 {
                                     DeleteFile(remoteFile);
@@ -187,12 +202,17 @@ namespace FileSyncLibNet.SyncProviders
 
                         }
                         else
+                        {
                             logger.LogDebug("Skip {A}", realFilePath);
+                            skipped++;
+                        }
                     }
                 }
 
 
             }
+            sw.Stop();
+            logger.LogInformation("{A} files copied, {B} files skipped in {C}s", copied, skipped, sw.ElapsedMilliseconds / 1000.0);
         }
 
 
@@ -227,7 +247,7 @@ namespace FileSyncLibNet.SyncProviders
             }
 
 
-
+         
         }
 
         public void Dispose()
@@ -340,11 +360,12 @@ namespace FileSyncLibNet.SyncProviders
             }
 
         }
-        List<string> ListFiles(string subPath, bool recurse)
+        List<string> ListFiles(string subPath, bool recurse, DateTimeOffset maxAge, out int skipped)
         {
             List<string> retval = new List<string>();
             object directoryHandle;
             FileStatus fileStatus;
+            skipped = 0;
             var status = fileStore.CreateFile(out directoryHandle, out fileStatus, subPath.Trim('\\'), AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE, null);
             if (status == NTStatus.STATUS_SUCCESS)
             {
@@ -364,14 +385,21 @@ namespace FileSyncLibNet.SyncProviders
                             {
                                 try
                                 {
-                                    retval.AddRange(ListFiles(Path.Combine(subPath.Trim('\\'), file.FileName), recurse));
+                                    retval.AddRange(ListFiles(Path.Combine(subPath.Trim('\\'), file.FileName), recurse, maxAge, out int moreSkipped));
+                                    skipped += moreSkipped;
                                 }
                                 catch { }
                             }
                         }
                         else
                         {
-                            retval.Add(Path.Combine(subPath.Trim('\\'), file.FileName));
+                            if (file.LastWriteTime > maxAge)
+                                retval.Add(Path.Combine(subPath.Trim('\\'), file.FileName));
+                            else
+                            {
+                                skipped++;
+                                //logger.LogTrace("Skipping {0} because it should have been synced last time", file.FileName);
+                            }
                         }
 
                     }
@@ -434,7 +462,7 @@ namespace FileSyncLibNet.SyncProviders
             }
             else
             {
-                throw new Exception("unable to set attributes - status " + status);
+                throw new Exception("unable to get attributes - status " + status);
             }
 
         }

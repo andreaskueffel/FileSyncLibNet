@@ -45,7 +45,13 @@ namespace FileSyncLibNet.SyncProviders
                     searchPattern: JobOptions.SearchPattern,
                     searchOption: JobOptions.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 
-
+                if (jobOptions.RememberLastSync)
+                {
+                    var old = _fi.Count();
+                    _fi = _fi.Where(x => x.LastWriteTime > (LastRun - jobOptions.Interval)).ToList();
+                    skipped += old-_fi.Count(); 
+                    LastRun = DateTimeOffset.Now;
+                }
                 foreach (FileInfo f in _fi)
                 {
 

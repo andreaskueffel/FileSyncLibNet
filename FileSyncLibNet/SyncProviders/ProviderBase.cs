@@ -1,10 +1,6 @@
 ﻿using FileSyncLibNet.Commons;
-using FileSyncLibNet.FileSyncJob;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Text;
 
 namespace FileSyncLibNet.SyncProviders
 {
@@ -12,7 +8,7 @@ namespace FileSyncLibNet.SyncProviders
     {
         internal ILogger logger => JobOptions.Logger;
         public IFileJobOptions JobOptions { get; }
-
+        internal DateTimeOffset LastRun { get; set; } = DateTimeOffset.FromUnixTimeMilliseconds(0).ToLocalTime();
         public abstract void SyncSourceToDest();
         public abstract void DeleteFiles();
         public ProviderBase(IFileJobOptions jobOptions)
