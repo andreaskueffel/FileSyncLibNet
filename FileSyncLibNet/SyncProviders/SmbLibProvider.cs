@@ -173,14 +173,14 @@ namespace FileSyncLibNet.SyncProviders
                                 File.Delete(file);
                         }
                     }
-                    foreach (var remoteFile in remoteFiles)
+                    foreach (var remoteFileFromSource in remoteFiles)
                     {
                         bool copy = false;
-                        var realFilePath = remoteFile.Trim('\\').Replace('/', '\\');
-                        
+                        var realFilePath = remoteFileFromSource.Trim('\\').Replace('/', '\\');
+                        var remoteFileWithSource = Path.Combine(SourcePath, remoteFileFromSource).Trim('\\');
                         var localFile = Path.Combine(jobOptions.DestinationPath, realFilePath.TrimStart('\\', '/')).Replace('/', '\\');
                         var exists = File.Exists(localFile);
-                        _ = FileExists(remoteFile, out long remoteSize);
+                        _ = FileExists(remoteFileWithSource, out long remoteSize);
                         var size = exists ? new FileInfo(localFile).Length : 0;
                         copy = !exists || size != remoteSize;
                         if (copy)
@@ -188,11 +188,11 @@ namespace FileSyncLibNet.SyncProviders
                             logger.LogDebug("Copy {A}", realFilePath);
                             try
                             {
-                                ReadFile(Path.Combine(SourcePath, remoteFile), localFile);
+                                ReadFile(remoteFileWithSource, localFile);
                                 copied++;
                                 if (jobOptions.DeleteSourceAfterBackup)
                                 {
-                                    DeleteFile(remoteFile);
+                                    DeleteFile(remoteFileWithSource);
                                 }
                             }
                             catch (Exception exc)
