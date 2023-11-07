@@ -12,6 +12,7 @@ namespace FileSyncLibNet.FileSyncJob
         public string SourcePath { get; set; }
         public bool SyncDeleted { get; set; } = false;
         public bool DeleteSourceAfterBackup { get; set; } = false;
+        public bool RememberLastSync { get; set; } = true;
 
         public FileSyncJobOptions()
         {
