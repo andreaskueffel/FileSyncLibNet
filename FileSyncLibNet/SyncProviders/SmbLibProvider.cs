@@ -88,7 +88,7 @@ namespace FileSyncLibNet.SyncProviders
                     }
                     if (jobOptions.SyncDeleted)
                     {
-                        var remoteFiles = ListFiles(DestinationPath, true, jobOptions.RememberLastSync ? LastRun - jobOptions.Interval : DateTime.MinValue, out _);
+                        var remoteFiles = ListFiles("", DestinationPath, true, jobOptions.RememberLastSync ? LastRun - jobOptions.Interval : DateTime.MinValue, out _);
                         foreach (var file in remoteFiles)
                         {
                             var realFilePath = file.Substring(file.IndexOf(DestinationPath) + DestinationPath.Length).Trim('\\').Replace('/', '\\');
@@ -161,14 +161,14 @@ namespace FileSyncLibNet.SyncProviders
                     searchPattern: JobOptions.SearchPattern,
                     searchOption: JobOptions.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 
-                    var remoteFiles = ListFiles(Path.Combine(SourcePath, dir.Name), JobOptions.Recursive, jobOptions.RememberLastSync ? LastRun - jobOptions.Interval : DateTime.MinValue, out int skippedByTimestamp);
+                    var remoteFiles = ListFiles(SourcePath, dir.Name, JobOptions.Recursive, jobOptions.RememberLastSync ? LastRun - jobOptions.Interval : DateTime.MinValue, out int skippedByTimestamp);
                     skipped += skippedByTimestamp;
                     LastRun = DateTimeOffset.Now;
                     if (jobOptions.SyncDeleted)
                     {
                         foreach (var file in remoteFiles)
                         {
-                            var realFilePath = file.Substring(file.IndexOf(SourcePath) + SourcePath.Length).Trim('\\').Replace('/', '\\');
+                            var realFilePath = file.Trim('\\').Replace('/', '\\');
                             if (!_fi.Any(x => x.FullName.Replace('/', '\\').EndsWith(realFilePath)))
                                 File.Delete(file);
                         }
@@ -176,7 +176,7 @@ namespace FileSyncLibNet.SyncProviders
                     foreach (var remoteFile in remoteFiles)
                     {
                         bool copy = false;
-                        var realFilePath = remoteFile.Substring(remoteFile.IndexOf(SourcePath) + SourcePath.Length).Trim('\\').Replace('/', '\\');
+                        var realFilePath = remoteFile.Trim('\\').Replace('/', '\\');
                         
                         var localFile = Path.Combine(jobOptions.DestinationPath, realFilePath.TrimStart('\\', '/')).Replace('/', '\\');
                         var exists = File.Exists(localFile);
@@ -188,7 +188,7 @@ namespace FileSyncLibNet.SyncProviders
                             logger.LogDebug("Copy {A}", realFilePath);
                             try
                             {
-                                ReadFile(remoteFile, localFile);
+                                ReadFile(Path.Combine(SourcePath, remoteFile), localFile);
                                 copied++;
                                 if (jobOptions.DeleteSourceAfterBackup)
                                 {
@@ -360,13 +360,13 @@ namespace FileSyncLibNet.SyncProviders
             }
 
         }
-        List<string> ListFiles(string subPath, bool recurse, DateTimeOffset maxAge, out int skipped)
+        List<string> ListFiles(string sourcePath, string sourcesubPath, bool recurse, DateTimeOffset maxAge, out int skipped)
         {
             List<string> retval = new List<string>();
             object directoryHandle;
             FileStatus fileStatus;
             skipped = 0;
-            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, subPath.Trim('\\'), AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE, null);
+            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, Path.Combine(sourcePath, sourcesubPath).Trim('\\'), AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE, null);
             if (status == NTStatus.STATUS_SUCCESS)
             {
                 List<QueryDirectoryFileInformation> fileList;
@@ -385,7 +385,7 @@ namespace FileSyncLibNet.SyncProviders
                             {
                                 try
                                 {
-                                    retval.AddRange(ListFiles(Path.Combine(subPath.Trim('\\'), file.FileName), recurse, maxAge, out int moreSkipped));
+                                    retval.AddRange(ListFiles(sourcePath,Path.Combine(sourcesubPath, file.FileName).Trim('\\'), recurse, maxAge, out int moreSkipped));
                                     skipped += moreSkipped;
                                 }
                                 catch { }
@@ -394,7 +394,7 @@ namespace FileSyncLibNet.SyncProviders
                         else
                         {
                             if (file.LastWriteTime > maxAge)
-                                retval.Add(Path.Combine(subPath.Trim('\\'), file.FileName));
+                                retval.Add(Path.Combine(sourcesubPath.Trim('\\'), file.FileName));
                             else
                             {
                                 skipped++;
