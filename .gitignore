@@ -398,3 +398,4 @@ FodyWeavers.xsd
 *.sln.iml
 /*.sln
 /FileSyncLibNet/FileSyncLibNet.sln
+/FileSyncAppWin/pub

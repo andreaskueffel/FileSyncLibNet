@@ -53,6 +53,11 @@ namespace FileSyncLibNet.FileSyncJob
             jobOptions.SyncDeleted = syncDeleted;
             return this;
         }
+        public IFileSyncJobOptionsBuilderSetProperties RememberLastSync(bool rememberLastSync)
+        {
+            jobOptions.RememberLastSync = rememberLastSync;
+            return this;
+        }
 
         public IFileSyncJobOptionsBuilderSetProperties WithCredentials(string username, string password)
         {
