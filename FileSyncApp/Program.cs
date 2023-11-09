@@ -77,7 +77,7 @@ namespace FileSyncApp
                 jobOptions.Add("CleanJob", cleanJob);
 
                 var syncFromEdgeToLocal = FileSyncJobOptionsBuilder.CreateBuilder()
-                    .WithSourcePath("\\\\192.168.214.240\\share\\hri\\production")
+                    .WithSourcePath("\\\\edgeip\\share\\service\\production")
                     .WithDestinationPath("temp")
                     .WithFileSyncProvider(SyncProvider.SMBLib)
                     .WithSubfolder("left")
@@ -92,7 +92,7 @@ namespace FileSyncApp
 
                 var syncFromLocalToRemote = FileSyncJobOptionsBuilder.CreateBuilder()
                     .WithSourcePath("temp")
-                    .WithDestinationPath("\\\\sbr-verzsrvdmz\\Schwingungsueberwachung$\\Serienspektren_Import\\" + hostname)
+                    .WithDestinationPath("\\\\SERVER\\Share\\Subfolder\\" + hostname)
                     .WithFileSyncProvider(SyncProvider.FileIO)
                     .WithInterval(TimeSpan.FromMinutes(15))
                     .DeleteAfterBackup(false) //sonst werden die Daten wieder neu von der Edge geholt
