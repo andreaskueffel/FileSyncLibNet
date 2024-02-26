@@ -29,20 +29,12 @@ namespace FileSyncApp
         public static volatile bool keepRunning = true;
         public static LoggingLevelSwitch LoggingLevel { get; private set; }
         public static ILoggerFactory LoggerFactory { get; private set; }
+        private static Microsoft.Extensions.Logging.ILogger log;
         public static Dictionary<string, IFileJob> Jobs = new Dictionary<string, IFileJob>();
         public static void Main(string[] args)
         {
-
-
-
-
-
-            LoggingLevel= new LoggingLevelSwitch(Serilog.Events.LogEventLevel.Information);
-#if DEBUG
-            LoggingLevel= new LoggingLevelSwitch(Serilog.Events.LogEventLevel.Verbose);
-#endif
             ConfigureLogger();
-            LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { builder.AddSerilog(Serilog.Log.Logger); });
+            log = LoggerFactory.CreateLogger("FileSyncAppMain");
             if (null!=args && args.Length > 0)
             {
                 if (args.Contains("debug"))
@@ -58,7 +50,7 @@ namespace FileSyncApp
         
         static void RunProgram()
         {
-            Console.WriteLine("FileSyncApp - synchronizing folders and clean them up");
+            log.LogInformation("FileSyncApp - synchronizing folders and clean them up");
             Dictionary<string, IFileJobOptions> jobOptions = new Dictionary<string, IFileJobOptions>();
             var jsonSettings = new JsonSerializerSettings
             {
@@ -68,6 +60,7 @@ namespace FileSyncApp
             };
             if (!File.Exists("config.json"))
             {
+                log.LogInformation("Config file {A} not found, creating a new one", "config.json");
                 var cleanJob = FileCleanJobOptionsBuilder.CreateBuilder()
                    .WithDestinationPath("temp")
                    .WithInterval(TimeSpan.FromMinutes(21))
@@ -103,6 +96,7 @@ namespace FileSyncApp
                 var json = JsonConvert.SerializeObject(jobOptions, Formatting.Indented, jsonSettings);
                 File.WriteAllText("config.json", json);
             }
+            log.LogInformation("reading config file {A}", "config.json");
             var readJobOptions = JsonConvert.DeserializeObject<Dictionary<string, IFileJobOptions>>(File.ReadAllText("config.json"), jsonSettings);
             //List<IFileJob> Jobs = new List<IFileJob>();
 
@@ -117,16 +111,22 @@ namespace FileSyncApp
             {
                 job.Value.StartJob();
             }
-            Console.WriteLine("Press Ctrl+C to exit");
+            log.LogInformation("Press Ctrl+C to exit");
             while (keepRunning)
             {
-                Thread.Sleep(200);
+                Thread.Sleep(500);
             }
         }
 
 
-        private static void ConfigureLogger()
+        public static void ConfigureLogger()
         {
+            if (LoggingLevel != null)
+                return;
+            LoggingLevel = new LoggingLevelSwitch(Serilog.Events.LogEventLevel.Information);
+#if DEBUG
+            LoggingLevel = new LoggingLevelSwitch(Serilog.Events.LogEventLevel.Verbose);
+#endif
             string serilogFileTemplate = "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext:l} {Message:lj}{NewLine}{Exception}";
             string serilogConsoleTemplate = "{Timestamp:HH:mm:ss.fff}[{Level:u3}]{SourceContext:l} {Message:lj}{NewLine}{Exception}";
             Serilog.Log.Logger = new LoggerConfiguration()
@@ -137,12 +137,13 @@ namespace FileSyncApp
                     retainedFileCountLimit: 10,
                     fileSizeLimitBytes: 1024 * 1024 * 100,
                     rollingInterval: RollingInterval.Day,
+                    rollOnFileSizeLimit: true,
                     outputTemplate: serilogFileTemplate),
                     blockWhenFull: true)
                 .MinimumLevel.ControlledBy(LoggingLevel)
                 .CreateLogger();
 
-
+            LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { builder.AddSerilog(Serilog.Log.Logger); });
         }
 
 
