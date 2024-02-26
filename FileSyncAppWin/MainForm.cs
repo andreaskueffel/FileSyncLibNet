@@ -1,5 +1,3 @@
-using FileSyncLibNet.Commons;
-
 namespace FileSyncAppWin
 {
     public partial class MainForm : Form
@@ -12,11 +10,11 @@ namespace FileSyncAppWin
             this.FormClosing += (s, e) => { FileSyncApp.Program.keepRunning = false; consoleThread?.Join(10_000); };
             consoleThread = new Thread(() =>
             {
-
                 FileSyncApp.Program.Main(null);
             });
-            FileSyncApp.Program.JobsReady += (s,e)=> { 
-                foreach(var job in FileSyncApp.Program.Jobs)
+            FileSyncApp.Program.JobsReady += (s, e) =>
+            {
+                foreach (var job in FileSyncApp.Program.Jobs)
                 {
                     job.Value.JobStarted += (j, text) =>
                     {
@@ -36,6 +34,7 @@ namespace FileSyncAppWin
 
             };
             consoleThread.Start();
+            
             this.Resize += ((s, e) =>
             {
                 this.SuspendLayout();
@@ -56,20 +55,20 @@ namespace FileSyncAppWin
             {
                 this.BeginInvoke(() => { WindowState = FormWindowState.Normal; ShowInTaskbar = true; });
             };
-            notifyIcon1.BalloonTipClicked += (s, e) => { this.BeginInvoke(() => { WindowState = FormWindowState.Normal; ShowInTaskbar = true; });            };
+            notifyIcon1.BalloonTipClicked += (s, e) => { this.BeginInvoke(() => { WindowState = FormWindowState.Normal; ShowInTaskbar = true; }); };
             //notifyIcon1.BalloonTipShown += (s, e) => { ShowInTaskbar = false; };
 
             //this.WindowState = FormWindowState.Minimized;
         }
 
-      
 
-        
+
+
         private void NewLogOutput(string e)
         {
 
-                    this.BeginInvoke(() => { textBox1.Text = string.Join(Environment.NewLine, (new string[] { $"{DateTime.Now.ToString("HH:mm:ss.fff")} {e}" }).Concat(textBox1.Text.Split(Environment.NewLine).Take(1000))); });
-                
+            this.BeginInvoke(() => { textBox1.Text = string.Join(Environment.NewLine, (new string[] { $"{DateTime.Now.ToString("HH:mm:ss.fff")} {e}" }).Concat(textBox1.Text.Split(Environment.NewLine).Take(1000))); });
+
         }
     }
 }
