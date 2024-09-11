@@ -9,5 +9,6 @@ namespace FileSyncLibNet.SyncProviders
         FileIO,
         SMBLib,
         Robocopy,
+        SCP,
     }
 }

@@ -35,6 +35,9 @@ namespace FileSyncLibNet.FileSyncJob
                 case SyncProvider.Robocopy:
                     syncProvider = new RoboCopyProvider(fileSyncJobOptions);
                     break;
+                case SyncProvider.SCP:
+                    syncProvider = new ScpProvider(fileSyncJobOptions);
+                    break;
             }
         }
 
