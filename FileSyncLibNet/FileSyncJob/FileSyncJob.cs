@@ -35,6 +35,9 @@ namespace FileSyncLibNet.FileSyncJob
                 case SyncProvider.Robocopy:
                     syncProvider = new RoboCopyProvider(fileSyncJobOptions);
                     break;
+                case SyncProvider.SCP:
+                    syncProvider = new ScpProvider(fileSyncJobOptions);
+                    break;
             }
         }
 
@@ -70,7 +73,14 @@ namespace FileSyncLibNet.FileSyncJob
         }
         private void TimerElapsed(object state)
         {
-            RunJobInterlocked();
+            try
+            {
+                RunJobInterlocked();
+            }
+            catch (Exception exc)
+            {
+                JobError?.Invoke(this, new FileSyncJobEventArgs(JobName, FileSyncJobStatus.Error, exc));
+            }
         }
 
         private void RunJobInterlocked()
