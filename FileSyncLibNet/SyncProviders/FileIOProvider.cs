@@ -240,7 +240,7 @@ namespace FileSyncLibNet.SyncProviders
             //                catch { log.LogInformation($"Konnte nicht auf Backuppfad {backupTarget} schreiben"); canWrite = false; }
             //            }
             //            if (canWrite)
-            //                foreach (string folder in new string[] { "HriFFTLog", "HriShockLog", "HriLog", "HriDebugLog", "HRI" })
+            //                
             //                {
             //                    string _path = Path.Combine(ProductionDataPath, folder);
             //                    if (!Directory.Exists(_path))

@@ -31,7 +31,7 @@ namespace FileSyncLibNet.FileCleanJob
         //    try
         //    {
         //        Dictionary<string, int> pathMaxDays = new Dictionary<string, int>();
-        //        string[] subFolders = { "HriFFTLog", "HriShockLog", "HriLog", "HriDebugLog", "raw" };
+        //        
         //        var driveInfo = new DriveInfo(Hauptprogramms.First().ProductionDataPath);
         //        int days = 59;
 

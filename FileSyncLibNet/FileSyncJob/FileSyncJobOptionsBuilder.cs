@@ -81,6 +81,11 @@ namespace FileSyncLibNet.FileSyncJob
             jobOptions.Subfolders.Add(subfolder);
             return this;
         }
+        public IFileSyncJobOptionsBuilderSetProperties WithSubfolders(params string[] subfolders)
+        {
+            jobOptions.Subfolders.AddRange(subfolders);
+            return this;
+        }
         public IFileSyncJobOptionsBuilderSetProperties DeleteAfterBackup(bool deleteAfterBackup)
         {
             jobOptions.DeleteSourceAfterBackup = deleteAfterBackup;
@@ -136,6 +141,7 @@ namespace FileSyncLibNet.FileSyncJob
         IFileSyncJobOptionsBuilderSetProperties WithCredentials(NetworkCredential networkCredential);
         IFileSyncJobOptionsBuilderSetProperties WithSearchPattern(string searchPattern);
         IFileSyncJobOptionsBuilderSetProperties WithSubfolder(string subfolder);
+        IFileSyncJobOptionsBuilderSetProperties WithSubfolders(params string[] subfolders);
         IFileSyncJobOptionsBuilderSetProperties DeleteAfterBackup(bool deleteAfterBackup);
         IFileSyncJobOptionsBuilderSetProperties WithLogger(ILogger logger);
         IFileSyncJobOptionsBuilderSetProperties WithLogger(Action<string> loggerAction);
