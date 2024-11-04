@@ -10,5 +10,6 @@ namespace FileSyncLibNet.SyncProviders
         SMBLib,
         Robocopy,
         SCP,
+        Abstract=100
     }
 }

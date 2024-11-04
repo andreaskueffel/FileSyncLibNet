@@ -1,7 +1,6 @@
 ﻿using FileSyncLibNet.Commons;
 using FileSyncLibNet.FileCleanJob;
 using FileSyncLibNet.FileSyncJob;
-using FileSyncLibNet.Logger;
 using FileSyncLibNet.SyncProviders;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -9,15 +8,8 @@ using Serilog;
 using Serilog.Core;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Net;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.ComTypes;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using System.Threading;
 using File = System.IO.File;
 
@@ -35,7 +27,7 @@ namespace FileSyncApp
         {
             ConfigureLogger();
             log = LoggerFactory.CreateLogger("FileSyncAppMain");
-            if (null!=args && args.Length > 0)
+            if (null != args && args.Length > 0)
             {
                 if (args.Contains("debug"))
                 {
@@ -46,8 +38,8 @@ namespace FileSyncApp
             RunProgram();
 
         }
-        
-        
+
+
         static void RunProgram()
         {
             log.LogInformation("FileSyncApp - synchronizing folders and clean them up");
@@ -103,7 +95,7 @@ namespace FileSyncApp
             foreach (var jobOption in readJobOptions)
             {
 
-                jobOption.Value.Logger = LoggerFactory.CreateLogger(jobOption.Key); 
+                jobOption.Value.Logger = LoggerFactory.CreateLogger(jobOption.Key);
                 Jobs.Add(jobOption.Key, FileSyncJob.CreateJob(jobOption.Value));
             }
             JobsReady?.Invoke(null, EventArgs.Empty);
