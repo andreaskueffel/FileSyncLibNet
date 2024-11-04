@@ -38,6 +38,9 @@ namespace FileSyncLibNet.FileSyncJob
                 case SyncProvider.SCP:
                     syncProvider = new ScpProvider(fileSyncJobOptions);
                     break;
+                case SyncProvider.Abstract:
+                    syncProvider = new AbstractProvider(fileSyncJobOptions);
+                    break;
             }
         }
 
