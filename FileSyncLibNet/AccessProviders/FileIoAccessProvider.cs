@@ -8,8 +8,11 @@ namespace FileSyncLibNet.AccessProviders
 {
     internal class FileIoAccessProvider : IAccessProvider
     {
-        public string AccessPath { get; }
-        public FileIoAccessProvider(string accessPath)
+        public string AccessPath { get; private set; }
+        public FileIoAccessProvider()
+        {
+        }
+        public void UpdateAccessPath(string accessPath)
         {
             AccessPath = accessPath;
         }

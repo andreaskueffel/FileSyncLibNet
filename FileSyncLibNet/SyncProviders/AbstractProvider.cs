@@ -18,20 +18,23 @@ namespace FileSyncLibNet.SyncProviders
                 throw new ArgumentException("this instance has no information about syncing files, it has type " + JobOptions.GetType().ToString());
             if (syncJobOptions.SourcePath.StartsWith("scp:"))
             {
-                SourceAccess = new ScpAccessProvider(syncJobOptions.SourcePath, syncJobOptions.Credentials);
+                SourceAccess = new ScpAccessProvider(syncJobOptions.Credentials);
+
             }
             else
             {
-                SourceAccess = new FileIoAccessProvider(syncJobOptions.SourcePath);
+                SourceAccess = new FileIoAccessProvider();
             }
+            SourceAccess.UpdateAccessPath(syncJobOptions.SourcePath);
             if (syncJobOptions.DestinationPath.StartsWith("scp:"))
             {
-                DestinationAccess = new ScpAccessProvider(syncJobOptions.DestinationPath, syncJobOptions.Credentials);
+                DestinationAccess = new ScpAccessProvider(syncJobOptions.Credentials);
             }
             else
             {
-                DestinationAccess = new FileIoAccessProvider(syncJobOptions.DestinationPath);
+                DestinationAccess = new FileIoAccessProvider();
             }
+
         }
 
         public override void DeleteFiles()
@@ -44,29 +47,40 @@ namespace FileSyncLibNet.SyncProviders
             if (!(JobOptions is IFileSyncJobOptions jobOptions))
                 throw new ArgumentException("this instance has no information about syncing files, it has type " + JobOptions.GetType().ToString());
             var sw = Stopwatch.StartNew();
+
             try
             {
-                DestinationAccess.CreateDirectory("");
+                string formattedDestinationPath = string.Format(jobOptions.DestinationPath, DateTime.Now);
+                DestinationAccess.UpdateAccessPath(formattedDestinationPath);
             }
-            catch (Exception ex) { logger?.LogError(ex, "exception creating destination directory {A}", jobOptions.DestinationPath); }
-            if (JobOptions.Credentials != null)
-            {
+            catch (Exception ex) { logger?.LogError(ex, "exception formatting destination accesspath with DateTime.Now as 0 arg {A}", jobOptions.DestinationPath); }
 
-            }
+            bool createDestinationDir = true;
             int copied = 0;
             int skipped = 0;
             var minimumLastWriteTime = jobOptions.RememberLastSync ? (LastRun - jobOptions.Interval - jobOptions.Interval) : DateTime.MinValue;
             bool error_occured = false;
             try
             {
-                var sourceFiles = SourceAccess.GetFiles(minimumLastWriteTime.DateTime, JobOptions.SearchPattern, recursive: JobOptions.Recursive, subfolders: JobOptions.Subfolders);
-
+                var sourceFiles = SourceAccess.GetFiles(minimumLastWriteTime: minimumLastWriteTime.DateTime,
+                                                        pattern: JobOptions.SearchPattern,
+                                                        recursive: JobOptions.Recursive,
+                                                        subfolders: JobOptions.Subfolders);
                 foreach (var sourceFile in sourceFiles)
                 {
                     var remoteFile = DestinationAccess.GetFileInfo(sourceFile.Name);
                     bool copy = !remoteFile.Exists || remoteFile.Length != sourceFile.Length || remoteFile.LastWriteTime != sourceFile.LastWriteTime;
                     if (copy)
                     {
+                        if (createDestinationDir)
+                        {
+                            try
+                            {
+                                DestinationAccess.CreateDirectory("");
+                            }
+                            catch (Exception ex) { logger?.LogError(ex, "exception creating destination directory {A}", jobOptions.DestinationPath); }
+                            createDestinationDir = false;
+                        }
                         try
                         {
                             logger.LogDebug("Copy {A}", sourceFile.Name);
@@ -100,7 +114,7 @@ namespace FileSyncLibNet.SyncProviders
                     LastRun = DateTimeOffset.Now;
                 }
             }
-            catch(Exception exc)
+            catch (Exception exc)
             {
                 logger.LogError(exc, "Exception in main logic of abstract provider");
             }

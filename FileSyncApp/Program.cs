@@ -62,9 +62,9 @@ namespace FileSyncApp
                 jobOptions.Add("CleanJob", cleanJob);
 
                 var syncFromEdgeToLocal = FileSyncJobOptionsBuilder.CreateBuilder()
-                    .WithSourcePath("\\\\edgeip\\share\\service\\production")
+                    .WithSourcePath("scp://edgeip/service/production")
                     .WithDestinationPath("temp")
-                    .WithFileSyncProvider(SyncProvider.SMBLib)
+                    .WithFileSyncProvider(SyncProvider.Abstract)
                     .WithSubfolder("left")
                     .WithSubfolder("right")
                     .WithCredentials(new System.Net.NetworkCredential("USER", "Password", ""))
