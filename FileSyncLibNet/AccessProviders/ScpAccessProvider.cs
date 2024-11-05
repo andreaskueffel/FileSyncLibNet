@@ -11,17 +11,35 @@ namespace FileSyncLibNet.AccessProviders
 {
     internal class ScpAccessProvider : IAccessProvider
     {
-        string AccessPathUri { get; }
+        public string AccessPathUri { get; private set; }
         NetworkCredential Credentials { get; }
         SftpClient ftpClient;
         public string AccessPath { get; private set; }
 
-        public ScpAccessProvider(string accessPath, NetworkCredential credentials)
+        public ScpAccessProvider(NetworkCredential credentials)
         {
-            AccessPathUri = accessPath;
             Credentials = credentials;
-            //CreateClient();
         }
+        public void UpdateAccessPath(string accessPath) 
+        { 
+            AccessPathUri = accessPath;
+            var pattern = @"scp://(?:(?<user>[^@]+)@)?(?<host>[^:/]+)(?::(?<port>\d+))?(?<path>/.*)?";
+            var match = Regex.Match(AccessPathUri, pattern);
+
+
+            if (!match.Success)
+            {
+                throw new UriFormatException($"Unable to match scp pattern with given URL {AccessPathUri}, use format scp://host:port/path");
+            }
+            else
+            {
+                AccessPath = match.Groups["path"].Value;
+                if (AccessPath.StartsWith("/~"))
+                    AccessPath = AccessPath.Substring(1);
+            }
+        }
+
+
         void CreateClient()
         {
             var pattern = @"scp://(?:(?<user>[^@]+)@)?(?<host>[^:/]+)(?::(?<port>\d+))?(?<path>/.*)?";
@@ -44,6 +62,7 @@ namespace FileSyncLibNet.AccessProviders
                 ftpClient = new SftpClient(host, port, Credentials.UserName, Credentials.Password);
             }
         }
+        
         void EnsureConnected()
         {
             if (ftpClient == null)

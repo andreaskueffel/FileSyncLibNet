@@ -8,6 +8,7 @@ namespace FileSyncLibNet.AccessProviders
     internal interface IAccessProvider
     {
         void CreateDirectory(string path);
+        void UpdateAccessPath(string path);
         List<FileInfo2> GetFiles(DateTime minimumLastWriteTime, string pattern, string path = null, bool recursive = false, List<string> subfolders = null);
         FileInfo2 GetFileInfo(string path);
         void Delete(FileInfo2 fileInfo);
