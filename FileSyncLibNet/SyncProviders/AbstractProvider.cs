@@ -18,20 +18,23 @@ namespace FileSyncLibNet.SyncProviders
                 throw new ArgumentException("this instance has no information about syncing files, it has type " + JobOptions.GetType().ToString());
             if (syncJobOptions.SourcePath.StartsWith("scp:"))
             {
-                SourceAccess = new ScpAccessProvider(syncJobOptions.SourcePath, syncJobOptions.Credentials);
+                SourceAccess = new ScpAccessProvider(syncJobOptions.Credentials);
+                
             }
             else
             {
-                SourceAccess = new FileIoAccessProvider(syncJobOptions.SourcePath);
+                SourceAccess = new FileIoAccessProvider();
             }
+            SourceAccess.UpdateAccessPath(syncJobOptions.SourcePath);
             if (syncJobOptions.DestinationPath.StartsWith("scp:"))
             {
-                DestinationAccess = new ScpAccessProvider(syncJobOptions.DestinationPath, syncJobOptions.Credentials);
+                DestinationAccess = new ScpAccessProvider(syncJobOptions.Credentials);
             }
             else
             {
-                DestinationAccess = new FileIoAccessProvider(syncJobOptions.DestinationPath);
+                DestinationAccess = new FileIoAccessProvider();
             }
+            
         }
 
         public override void DeleteFiles()
@@ -46,6 +49,8 @@ namespace FileSyncLibNet.SyncProviders
             var sw = Stopwatch.StartNew();
             try
             {
+                string formattedDestinationPath = string.Format(jobOptions.DestinationPath, DateTime.Now);
+                DestinationAccess.UpdateAccessPath(formattedDestinationPath);
                 DestinationAccess.CreateDirectory("");
             }
             catch (Exception ex) { logger?.LogError(ex, "exception creating destination directory {A}", jobOptions.DestinationPath); }
