@@ -1,4 +1,5 @@
 ﻿using FileSyncLibNet.Commons;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,8 +10,10 @@ namespace FileSyncLibNet.AccessProviders
     internal class FileIoAccessProvider : IAccessProvider
     {
         public string AccessPath { get; private set; }
-        public FileIoAccessProvider()
+        private readonly ILogger logger;
+        public FileIoAccessProvider(ILogger logger)
         {
+            this.logger = logger;
         }
         public void UpdateAccessPath(string accessPath)
         {
@@ -39,14 +42,20 @@ namespace FileSyncLibNet.AccessProviders
             List<FileInfo2> ret_val = new List<FileInfo2>();
             foreach (var dir in (subfolders != null && subfolders.Count > 0) ? _di.GetDirectories() : new[] { _di })
             {
-                if (subfolders != null && subfolders.Count > 0 && !subfolders.Select(x => x.ToLower()).Contains(dir.Name.ToLower()))
-                    continue;
-                var _fi = dir.EnumerateFiles(
-                    searchPattern: pattern,
-                    searchOption: recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+                try
+                {
+                    if (subfolders != null && subfolders.Count > 0 && !subfolders.Select(x => x.ToLower()).Contains(dir.Name.ToLower()))
+                        continue;
+                    var _fi = dir.EnumerateFiles(
+                        searchPattern: pattern,
+                        searchOption: recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 
 
-                ret_val.AddRange(_fi.Select(x => new FileInfo2(x.FullName.Substring(AccessPath.Length + 1), x.Exists) { Length = x.Length, LastWriteTime = x.LastWriteTime }).ToList());
+                    ret_val.AddRange(_fi.Select(x => new FileInfo2(x.FullName.Substring(AccessPath.Length + 1), x.Exists) { Length = x.Length, LastWriteTime = x.LastWriteTime }).ToList());
+                }
+                catch (Exception exc) {
+                    logger?.LogError(exc, "exception in GetFiles for path {A}, dir {B}", path, dir);
+                }
             }
             return ret_val;
         }

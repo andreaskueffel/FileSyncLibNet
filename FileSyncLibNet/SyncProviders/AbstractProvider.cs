@@ -18,21 +18,20 @@ namespace FileSyncLibNet.SyncProviders
                 throw new ArgumentException("this instance has no information about syncing files, it has type " + JobOptions.GetType().ToString());
             if (syncJobOptions.SourcePath.StartsWith("scp:"))
             {
-                SourceAccess = new ScpAccessProvider(syncJobOptions.Credentials);
-
+                SourceAccess = new ScpAccessProvider(syncJobOptions.Credentials, jobOptions.Logger);
             }
             else
             {
-                SourceAccess = new FileIoAccessProvider();
+                SourceAccess = new FileIoAccessProvider(jobOptions.Logger);
             }
             SourceAccess.UpdateAccessPath(syncJobOptions.SourcePath);
             if (syncJobOptions.DestinationPath.StartsWith("scp:"))
             {
-                DestinationAccess = new ScpAccessProvider(syncJobOptions.Credentials);
+                DestinationAccess = new ScpAccessProvider(syncJobOptions.Credentials, jobOptions.Logger);
             }
             else
             {
-                DestinationAccess = new FileIoAccessProvider();
+                DestinationAccess = new FileIoAccessProvider(jobOptions.Logger);
             }
 
         }

@@ -1,4 +1,5 @@
 ﻿using FileSyncLibNet.Commons;
+using Microsoft.Extensions.Logging;
 using Renci.SshNet;
 using System;
 using System.Collections.Generic;
@@ -15,13 +16,14 @@ namespace FileSyncLibNet.AccessProviders
         NetworkCredential Credentials { get; }
         SftpClient ftpClient;
         public string AccessPath { get; private set; }
-
-        public ScpAccessProvider(NetworkCredential credentials)
+        private readonly ILogger logger;
+        public ScpAccessProvider(NetworkCredential credentials, ILogger logger)
         {
+            this.logger = logger;
             Credentials = credentials;
         }
-        public void UpdateAccessPath(string accessPath) 
-        { 
+        public void UpdateAccessPath(string accessPath)
+        {
             AccessPathUri = accessPath;
             var pattern = @"scp://(?:(?<user>[^@]+)@)?(?<host>[^:/]+)(?::(?<port>\d+))?(?<path>/.*)?";
             var match = Regex.Match(AccessPathUri, pattern);
@@ -62,7 +64,7 @@ namespace FileSyncLibNet.AccessProviders
                 ftpClient = new SftpClient(host, port, Credentials.UserName, Credentials.Password);
             }
         }
-        
+
         void EnsureConnected()
         {
             if (ftpClient == null)
@@ -130,6 +132,7 @@ namespace FileSyncLibNet.AccessProviders
 
         public List<FileInfo2> GetFiles(DateTime minimumLastWriteTime, string pattern, string path = null, bool recursive = false, List<string> subfolders = null)
         {
+            //add try catch for non existent folders
             EnsureConnected();
             string basePath = string.IsNullOrEmpty(path) ? AccessPath : path;
             List<FileInfo2> ret_val = new List<FileInfo2>();
@@ -143,17 +146,24 @@ namespace FileSyncLibNet.AccessProviders
             }
             else
             {
-                var files = ftpClient.ListDirectory(basePath);
-                if (recursive)
+                try
                 {
-                    foreach (var folder in files.Where(x => x.IsDirectory && !(x.Name == ".") && !(x.Name == "..")))
+                    var files = ftpClient.ListDirectory(basePath);
+                    if (recursive)
                     {
-                        var subPath = System.IO.Path.Combine(folder.Name).Replace("\\", "/");
-                        ret_val.AddRange(GetFiles(minimumLastWriteTime, pattern, subPath, recursive));
+                        foreach (var folder in files.Where(x => x.IsDirectory && !(x.Name == ".") && !(x.Name == "..")))
+                        {
+                            var subPath = System.IO.Path.Combine(folder.Name).Replace("\\", "/");
+                            ret_val.AddRange(GetFiles(minimumLastWriteTime, pattern, subPath, recursive));
+                        }
                     }
+                    ret_val.AddRange(files.Where(x => MatchesPattern(x.Name, pattern)).Where(x => x.LastWriteTime >= minimumLastWriteTime && !x.IsDirectory).Select(x =>
+                    new FileInfo2($"{basePath.Substring(AccessPath.Length + 1)}/{x.Name}", exists: true) { LastWriteTime = x.LastWriteTime, Length = x.Length }).ToList());
                 }
-                ret_val.AddRange(files.Where(x => MatchesPattern(x.Name, pattern)).Where(x => x.LastWriteTime >= minimumLastWriteTime && !x.IsDirectory).Select(x =>
-                new FileInfo2($"{basePath.Substring(AccessPath.Length + 1)}/{x.Name}", exists: true) { LastWriteTime = x.LastWriteTime, Length = x.Length }).ToList());
+                catch (Exception exc)
+                {
+                    logger?.LogError(exc, "exception in GetFiles for path {A}, basePath {B}", path, basePath);
+                }
             }
             return ret_val;
         }
