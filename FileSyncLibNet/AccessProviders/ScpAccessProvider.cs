@@ -153,7 +153,7 @@ namespace FileSyncLibNet.AccessProviders
                     {
                         foreach (var folder in files.Where(x => x.IsDirectory && !(x.Name == ".") && !(x.Name == "..")))
                         {
-                            var subPath = System.IO.Path.Combine(folder.Name).Replace("\\", "/");
+                            var subPath = System.IO.Path.Combine(basePath, folder.Name).Replace("\\", "/");
                             ret_val.AddRange(GetFiles(minimumLastWriteTime, pattern, subPath, recursive));
                         }
                     }
