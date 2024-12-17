@@ -120,7 +120,7 @@ namespace FileSyncLibNet.SyncProviders
                             if (!Directory.Exists(pathMaxDay))
                                 Directory.CreateDirectory(pathMaxDay);
                             DirectoryInfo di = new DirectoryInfo(pathMaxDay);
-                            FileInfo[] fi = di.GetFiles();
+                            FileInfo[] fi = di.GetFiles(searchPattern: jobOptions.SearchPattern, jobOptions.Recursive? SearchOption.AllDirectories: SearchOption.TopDirectoryOnly);
                             foreach (FileInfo f in fi)
                             {
                                 if (f.LastWriteTime < (DateTime.Now - currentAge))
