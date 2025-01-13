@@ -18,20 +18,21 @@ namespace FileSyncLibNet.SyncProviders
                 throw new ArgumentException("this instance has no information about syncing files, it has type " + JobOptions.GetType().ToString());
             if (syncJobOptions.SourcePath.StartsWith("scp:"))
             {
-                SourceAccess = new ScpAccessProvider(syncJobOptions.Credentials, jobOptions.Logger);
+                SourceAccess = new ScpAccessProvider(syncJobOptions.Credentials, jobOptions.Logger, stateFilename: null);
             }
             else
             {
-                SourceAccess = new FileIoAccessProvider(jobOptions.Logger);
+                SourceAccess = new FileIoAccessProvider(jobOptions.Logger, stateFilename: null);
             }
             SourceAccess.UpdateAccessPath(syncJobOptions.SourcePath);
+            string stateFilename = syncJobOptions.RememberRemoteState ? syncJobOptions.GetHashedName() : null;
             if (syncJobOptions.DestinationPath.StartsWith("scp:"))
             {
-                DestinationAccess = new ScpAccessProvider(syncJobOptions.Credentials, jobOptions.Logger);
+                DestinationAccess = new ScpAccessProvider(syncJobOptions.Credentials, jobOptions.Logger, stateFilename);
             }
             else
             {
-                DestinationAccess = new FileIoAccessProvider(jobOptions.Logger);
+                DestinationAccess = new FileIoAccessProvider(jobOptions.Logger, stateFilename);
             }
 
         }
@@ -57,7 +58,13 @@ namespace FileSyncLibNet.SyncProviders
             bool createDestinationDir = true;
             int copied = 0;
             int skipped = 0;
-            var minimumLastWriteTime = jobOptions.RememberLastSync ? (LastRun - jobOptions.Interval - jobOptions.Interval) : DateTime.MinValue;
+            var minimumLastWriteTime = jobOptions.RememberLastSync ?
+                (LastRun - jobOptions.Interval - jobOptions.Interval) :
+                (jobOptions.MaxAge < jobOptions.Interval ?
+                    DateTimeOffset.MinValue :
+                    DateTimeOffset.Now - jobOptions.MaxAge
+                );
+
             bool error_occured = false;
             try
             {

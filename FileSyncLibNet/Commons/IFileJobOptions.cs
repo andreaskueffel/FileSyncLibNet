@@ -17,5 +17,6 @@ namespace FileSyncLibNet.Commons
         bool Recursive { get; set; }
         string SearchPattern { get; set; }
         List<string> Subfolders { get; set; }
+        string GetHashedName();
     }
 }

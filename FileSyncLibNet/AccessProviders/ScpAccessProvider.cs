@@ -15,10 +15,14 @@ namespace FileSyncLibNet.AccessProviders
         public string AccessPathUri { get; private set; }
         NetworkCredential Credentials { get; }
         SftpClient ftpClient;
+        private readonly RemoteState remoteState;
         public string AccessPath { get; private set; }
+        
         private readonly ILogger logger;
-        public ScpAccessProvider(NetworkCredential credentials, ILogger logger)
+        public ScpAccessProvider(NetworkCredential credentials, ILogger logger, string stateFilename)
         {
+            if (!string.IsNullOrEmpty(stateFilename))
+                remoteState = new RemoteState(stateFilename);
             this.logger = logger;
             Credentials = credentials;
         }
@@ -101,8 +105,11 @@ namespace FileSyncLibNet.AccessProviders
 
         public FileInfo2 GetFileInfo(string path)
         {
-            EnsureConnected();
             var realFilename = System.IO.Path.Combine(AccessPath, path).Replace("\\", "/");
+            if (remoteState != null)
+                return remoteState.GetFileInfo(realFilename);
+
+            EnsureConnected();
             if (ftpClient.Exists(realFilename))
             {
                 var fi = ftpClient.ListDirectory(realFilename);
@@ -149,6 +156,7 @@ namespace FileSyncLibNet.AccessProviders
                 try
                 {
                     var files = ftpClient.ListDirectory(basePath);
+                    var sepChar="/";
                     if (recursive)
                     {
                         foreach (var folder in files.Where(x => x.IsDirectory && !(x.Name == ".") && !(x.Name == "..")))
@@ -158,7 +166,7 @@ namespace FileSyncLibNet.AccessProviders
                         }
                     }
                     ret_val.AddRange(files.Where(x => MatchesPattern(x.Name, pattern)).Where(x => x.LastWriteTime >= minimumLastWriteTime && !x.IsDirectory).Select(x =>
-                    new FileInfo2($"{basePath.Substring(AccessPath.Length + 1)}/{x.Name}", exists: true) { LastWriteTime = x.LastWriteTime, Length = x.Length }).ToList());
+                    new FileInfo2($"{(AccessPath.Length + 1<basePath.Length?(basePath.Substring(AccessPath.Length+1))+sepChar:string.Empty)}{x.Name}", exists: true) { LastWriteTime = x.LastWriteTime, Length = x.Length }).ToList());
                 }
                 catch (Exception exc)
                 {
@@ -188,6 +196,7 @@ namespace FileSyncLibNet.AccessProviders
 
                 content.CopyTo(stream);
             }
+            remoteState?.SetFileInfo(filePath, file);
         }
 
         public void Delete(FileInfo2 fileInfo)
@@ -195,6 +204,7 @@ namespace FileSyncLibNet.AccessProviders
             EnsureConnected();
             var filePath = System.IO.Path.Combine(AccessPath, fileInfo.Name).Replace("\\", "/");
             ftpClient.Delete(filePath);
+            remoteState?.RemoveFileInfo(filePath);
         }
     }
 }

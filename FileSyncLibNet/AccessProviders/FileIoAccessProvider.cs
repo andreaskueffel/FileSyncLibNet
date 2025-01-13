@@ -10,10 +10,14 @@ namespace FileSyncLibNet.AccessProviders
     internal class FileIoAccessProvider : IAccessProvider
     {
         public string AccessPath { get; private set; }
+        private readonly RemoteState remoteState;
         private readonly ILogger logger;
-        public FileIoAccessProvider(ILogger logger)
+        public FileIoAccessProvider(ILogger logger, string stateFilename)
         {
             this.logger = logger;
+            if (!string.IsNullOrEmpty(stateFilename))
+                remoteState = new RemoteState(stateFilename);
+            
         }
         public void UpdateAccessPath(string accessPath)
         {
@@ -27,6 +31,9 @@ namespace FileSyncLibNet.AccessProviders
 
         public FileInfo2 GetFileInfo(string path)
         {
+            if(null!=remoteState)
+                return remoteState.GetFileInfo(Path.Combine(AccessPath, path));
+
             var fi = new FileInfo(Path.Combine(AccessPath, path));
 
             return new FileInfo2(path, fi.Exists)
@@ -75,12 +82,13 @@ namespace FileSyncLibNet.AccessProviders
                 content.CopyTo(stream);
             }
             File.SetLastWriteTime(realFilename, file.LastWriteTime);
-
+            remoteState?.SetFileInfo(realFilename, file);
         }
         public void Delete(FileInfo2 fileInfo)
         {
             var realFilename = Path.Combine(AccessPath, fileInfo.Name);
             File.Delete(realFilename);
+            remoteState?.RemoveFileInfo(realFilename);
         }
     }
 }
