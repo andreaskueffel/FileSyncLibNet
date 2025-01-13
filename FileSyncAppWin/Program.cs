@@ -18,7 +18,7 @@ namespace FileSyncAppWin
         [STAThread]
         static void Main(string[] args)
         {
-            FileSyncApp.Program.ConfigureLogger();
+            FileSyncApp.Program.ConfigureLogger(args.FirstOrDefault());
             logger = FileSyncApp.Program.LoggerFactory.CreateLogger("FileSyncAppWin");
             if (args.Contains("noautorestart"))
             {

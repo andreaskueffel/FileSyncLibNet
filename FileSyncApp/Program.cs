@@ -25,7 +25,7 @@ namespace FileSyncApp
         public static Dictionary<string, IFileJob> Jobs = new Dictionary<string, IFileJob>();
         public static void Main(string[] args)
         {
-            ConfigureLogger();
+            ConfigureLogger(args.FirstOrDefault());
             log = LoggerFactory.CreateLogger("FileSyncAppMain");
             if (null != args && args.Length > 0)
             {
@@ -71,7 +71,15 @@ namespace FileSyncApp
                     .WithInterval(TimeSpan.FromMinutes(10) + TimeSpan.FromSeconds(25))
                     .SyncRecursive(true)
                     .Build();
+
                 jobOptions.Add("SyncFromEdgeToLocal", syncFromEdgeToLocal);
+                var clean = FileCleanJobOptionsBuilder.CreateBuilder()
+                    .WithDestinationPath("\\\\sbrv\\share\\folder")
+                    .WithFileSyncProvider(SyncProvider.FileIO)
+                    .WithMaxAge(TimeSpan.FromDays(30))
+                    .Build();
+
+                jobOptions.Add("cleanJob", clean);
 
                 var hostname = Dns.GetHostName();
 
@@ -111,14 +119,22 @@ namespace FileSyncApp
         }
 
 
-        public static void ConfigureLogger()
+        public static void ConfigureLogger(string logLevel)
         {
-            if (LoggingLevel != null)
-                return;
+            Exception logLevelException = null;
             LoggingLevel = new LoggingLevelSwitch(Serilog.Events.LogEventLevel.Information);
-#if DEBUG
-            LoggingLevel = new LoggingLevelSwitch(Serilog.Events.LogEventLevel.Verbose);
-#endif
+            try
+            {
+                if (!string.IsNullOrEmpty(logLevel))
+                {
+                    LoggingLevel = new LoggingLevelSwitch((Serilog.Events.LogEventLevel)Enum.Parse(typeof(Serilog.Events.LogEventLevel), logLevel));
+                }
+            }
+            catch (Exception exc)
+            {
+                logLevelException = exc;
+            }
+
             string serilogFileTemplate = "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext:l} {Message:lj}{NewLine}{Exception}";
             string serilogConsoleTemplate = "{Timestamp:HH:mm:ss.fff}[{Level:u3}]{SourceContext:l} {Message:lj}{NewLine}{Exception}";
             Serilog.Log.Logger = new LoggerConfiguration()
@@ -136,6 +152,10 @@ namespace FileSyncApp
                 .CreateLogger();
 
             LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { builder.AddSerilog(Serilog.Log.Logger); });
+            if (null != logLevelException)
+            {
+                Serilog.Log.Error(logLevelException, "exception setting log level to {A}", logLevel);
+            }
         }
 
 
