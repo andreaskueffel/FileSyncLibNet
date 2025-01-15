@@ -99,7 +99,7 @@ namespace FileSyncApp
             }
 
             log.LogInformation("reading config file {A}", "config.json");
-            Dictionary<string, IFileJobOptions> readJobOptions=new Dictionary<string, IFileJobOptions>();
+            Dictionary<string, IFileJobOptions> readJobOptions = new Dictionary<string, IFileJobOptions>();
             try
             {
                 readJobOptions = JsonConvert.DeserializeObject<Dictionary<string, IFileJobOptions>>(File.ReadAllText("config.json"), jsonSettings);
@@ -109,17 +109,20 @@ namespace FileSyncApp
                 log.LogCritical(exc, "exception reading config file {A}", "config.json");
                 return;
             }
-            
+
             foreach (var jobOption in readJobOptions)
             {
-
                 jobOption.Value.Logger = LoggerFactory.CreateLogger(jobOption.Key);
                 Jobs.Add(jobOption.Key, FileSyncJob.CreateJob(jobOption.Value));
             }
             JobsReady?.Invoke(null, EventArgs.Empty);
+            Dictionary<IFileJob, bool> jobsDone = new Dictionary<IFileJob, bool>();
             foreach (var job in Jobs)
             {
+                jobsDone.Add(job.Value, false);
+                job.Value.JobFinished += (s, e) => { jobsDone[(IFileJob)s] = true; if (jobsDone.All(x => x.Value)) if (!File.Exists("fullsync.done")) File.Create("fullsync.done"); };
                 job.Value.StartJob();
+
             }
             log.LogInformation("Press Ctrl+C to exit");
             while (keepRunning)

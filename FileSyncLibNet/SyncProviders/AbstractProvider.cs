@@ -117,6 +117,11 @@ namespace FileSyncLibNet.SyncProviders
                     DateTimeOffset.MinValue :
                     DateTimeOffset.Now - jobOptions.MaxAge - jobOptions.Interval;
             }
+            if (!System.IO.File.Exists("fullsync.done"))
+            {
+                logger.LogWarning("fullsync.done not found, syncing all files for initial run");
+                minimumLastWriteTime = DateTimeOffset.MinValue;
+            }
 
             bool error_occured = false;
             try
