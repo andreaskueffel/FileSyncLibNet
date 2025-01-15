@@ -25,7 +25,7 @@ namespace FileSyncApp
         public static Dictionary<string, IFileJob> Jobs = new Dictionary<string, IFileJob>();
         public static void Main(string[] args)
         {
-            ConfigureLogger(args.FirstOrDefault());
+            ConfigureLogger(args?.FirstOrDefault());
             log = LoggerFactory.CreateLogger("FileSyncAppMain");
             if (null != args && args.Length > 0)
             {
@@ -50,6 +50,7 @@ namespace FileSyncApp
                 ContractResolver = new IgnorePropertyResolver(new string[] { "Logger" }),
                 TypeNameHandling = TypeNameHandling.Auto,
             };
+
             if (!File.Exists("config.json"))
             {
                 log.LogInformation("Config file {A} not found, creating a new one", "config.json");
@@ -96,20 +97,32 @@ namespace FileSyncApp
                 var json = JsonConvert.SerializeObject(jobOptions, Formatting.Indented, jsonSettings);
                 File.WriteAllText("config.json", json);
             }
+
             log.LogInformation("reading config file {A}", "config.json");
-            var readJobOptions = JsonConvert.DeserializeObject<Dictionary<string, IFileJobOptions>>(File.ReadAllText("config.json"), jsonSettings);
-            //List<IFileJob> Jobs = new List<IFileJob>();
+            Dictionary<string, IFileJobOptions> readJobOptions = new Dictionary<string, IFileJobOptions>();
+            try
+            {
+                readJobOptions = JsonConvert.DeserializeObject<Dictionary<string, IFileJobOptions>>(File.ReadAllText("config.json"), jsonSettings);
+            }
+            catch (Exception exc)
+            {
+                log.LogCritical(exc, "exception reading config file {A}", "config.json");
+                return;
+            }
 
             foreach (var jobOption in readJobOptions)
             {
-
                 jobOption.Value.Logger = LoggerFactory.CreateLogger(jobOption.Key);
                 Jobs.Add(jobOption.Key, FileSyncJob.CreateJob(jobOption.Value));
             }
             JobsReady?.Invoke(null, EventArgs.Empty);
+            Dictionary<IFileJob, bool> jobsDone = new Dictionary<IFileJob, bool>();
             foreach (var job in Jobs)
             {
+                jobsDone.Add(job.Value, false);
+                job.Value.JobFinished += (s, e) => { jobsDone[(IFileJob)s] = true; if (jobsDone.All(x => x.Value)) if (!File.Exists("fullsync.done")) File.Create("fullsync.done"); };
                 job.Value.StartJob();
+
             }
             log.LogInformation("Press Ctrl+C to exit");
             while (keepRunning)

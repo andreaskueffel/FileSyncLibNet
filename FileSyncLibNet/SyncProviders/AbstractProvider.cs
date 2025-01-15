@@ -1,5 +1,6 @@
 ﻿using FileSyncLibNet.AccessProviders;
 using FileSyncLibNet.Commons;
+using FileSyncLibNet.FileCleanJob;
 using FileSyncLibNet.FileSyncJob;
 using Microsoft.Extensions.Logging;
 using System;
@@ -14,32 +15,77 @@ namespace FileSyncLibNet.SyncProviders
 
         public AbstractProvider(IFileJobOptions jobOptions) : base(jobOptions)
         {
-            if (!(JobOptions is IFileSyncJobOptions syncJobOptions))
-                throw new ArgumentException("this instance has no information about syncing files, it has type " + JobOptions.GetType().ToString());
-            if (syncJobOptions.SourcePath.StartsWith("scp:"))
+            if (!(JobOptions is IFileCleanJobOptions) && !(JobOptions is IFileSyncJobOptions))
             {
-                SourceAccess = new ScpAccessProvider(syncJobOptions.Credentials, jobOptions.Logger, stateFilename: null);
+                throw new ArgumentException("this instance has no information about syncing files or cleaning files, it has type " + JobOptions.GetType().ToString());
+            }
+            string stateFilename = null;
+            if (JobOptions is IFileSyncJobOptions syncJobOptions)
+            {
+                if (syncJobOptions.SourcePath.StartsWith("scp:"))
+                {
+                    SourceAccess = new ScpAccessProvider(syncJobOptions.Credentials, JobOptions.Logger, stateFilename: null);
+                }
+                else
+                {
+                    SourceAccess = new FileIoAccessProvider(JobOptions.Logger, stateFilename: null);
+                }
+                SourceAccess.UpdateAccessPath(syncJobOptions.SourcePath);
+                stateFilename = null;
+            }
+            if (JobOptions.DestinationPath.StartsWith("scp:"))
+            {
+                DestinationAccess = new ScpAccessProvider(JobOptions.Credentials, JobOptions.Logger, stateFilename);
             }
             else
             {
-                SourceAccess = new FileIoAccessProvider(jobOptions.Logger, stateFilename: null);
-            }
-            SourceAccess.UpdateAccessPath(syncJobOptions.SourcePath);
-            string stateFilename = syncJobOptions.RememberRemoteState ? syncJobOptions.GetHashedName() : null;
-            if (syncJobOptions.DestinationPath.StartsWith("scp:"))
-            {
-                DestinationAccess = new ScpAccessProvider(syncJobOptions.Credentials, jobOptions.Logger, stateFilename);
-            }
-            else
-            {
-                DestinationAccess = new FileIoAccessProvider(jobOptions.Logger, stateFilename);
+                DestinationAccess = new FileIoAccessProvider(JobOptions.Logger, stateFilename);
             }
 
         }
 
         public override void DeleteFiles()
         {
-            throw new NotImplementedException();
+            //Use from file io provider and adapt to use access provider
+
+            if (!(JobOptions is IFileCleanJobOptions jobOptions))
+                throw new ArgumentException("this instance has no information about deleting files, it has type " + JobOptions.GetType().ToString());
+            try
+            {
+                string formattedDestinationPath = string.Format(jobOptions.DestinationPath, DateTime.Now);
+                DestinationAccess.UpdateAccessPath(formattedDestinationPath);
+            }
+            catch (Exception ex) { logger?.LogError(ex, "exception formatting destination accesspath with DateTime.Now as 0 arg {A}", jobOptions.DestinationPath); }
+
+            try
+            {
+                var minimumLastWriteTime = DateTimeOffset.Now - jobOptions.MaxAge;
+                var sourceFiles = DestinationAccess.GetFiles(minimumLastWriteTime: minimumLastWriteTime.DateTime,
+                                                       pattern: JobOptions.SearchPattern,
+                                                       recursive: JobOptions.Recursive,
+                                                       subfolders: JobOptions.Subfolders,
+                                                       olderFiles: true);
+                int fileCount = 0;
+                foreach (var fileToDelete in sourceFiles)
+                {
+                    logger.LogDebug("deleting file {A}", fileToDelete.Name);
+
+                    try
+                    {
+                        DestinationAccess.Delete(fileToDelete);
+
+                        fileCount++;
+                    }
+                    catch (Exception ex) { logger.LogError(ex, "exception deleting file {A}", fileToDelete.Name); }
+                    logger.LogDebug("deleted {A} files", fileCount);
+                }
+
+
+            }
+            catch (Exception exc)
+            {
+                logger.LogError(exc, "TimerCleanup_Tick threw an exception");
+            }
         }
 
         public override void SyncSourceToDest()
@@ -58,11 +104,11 @@ namespace FileSyncLibNet.SyncProviders
             bool createDestinationDir = true;
             int copied = 0;
             int skipped = 0;
-            DateTimeOffset minimumLastWriteTime = new DateTimeOffset(1970, 0, 0, 0, 0, 0, TimeSpan.Zero);
+            DateTimeOffset minimumLastWriteTime = new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero);
             if (jobOptions.RememberLastSync)
             {
                 if (LastRun.ToUnixTimeMilliseconds() == 0)
-                    LastRun = jobOptions.MaxAge < jobOptions.Interval ? new DateTimeOffset(1970, 0, 0, 0, 0, 0, TimeSpan.Zero) : DateTimeOffset.Now - jobOptions.MaxAge;
+                    LastRun = jobOptions.MaxAge < jobOptions.Interval ? new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero) : DateTimeOffset.Now - jobOptions.MaxAge;
                 minimumLastWriteTime = LastRun - jobOptions.Interval - jobOptions.Interval;
             }
             else
@@ -70,6 +116,11 @@ namespace FileSyncLibNet.SyncProviders
                 minimumLastWriteTime = jobOptions.MaxAge < jobOptions.Interval ?
                     DateTimeOffset.MinValue :
                     DateTimeOffset.Now - jobOptions.MaxAge - jobOptions.Interval;
+            }
+            if (!System.IO.File.Exists("fullsync.done"))
+            {
+                logger.LogWarning("fullsync.done not found, syncing all files for initial run");
+                minimumLastWriteTime = DateTimeOffset.MinValue;
             }
 
             bool error_occured = false;

@@ -17,7 +17,7 @@ namespace FileSyncLibNet.AccessProviders
             this.logger = logger;
             if (!string.IsNullOrEmpty(stateFilename))
                 remoteState = new RemoteState(stateFilename);
-            
+
         }
         public void UpdateAccessPath(string accessPath)
         {
@@ -31,7 +31,7 @@ namespace FileSyncLibNet.AccessProviders
 
         public FileInfo2 GetFileInfo(string path)
         {
-            if(null!=remoteState)
+            if (null != remoteState)
                 return remoteState.GetFileInfo(Path.Combine(AccessPath, path));
 
             var fi = new FileInfo(Path.Combine(AccessPath, path));
@@ -43,7 +43,7 @@ namespace FileSyncLibNet.AccessProviders
             };
         }
 
-        public List<FileInfo2> GetFiles(DateTime minimumLastWriteTime, string pattern, string path = null, bool recursive = false, List<string> subfolders = null)
+        public List<FileInfo2> GetFiles(DateTime minimumLastWriteTime, string pattern, string path = null, bool recursive = false, List<string> subfolders = null, bool olderFiles = false)
         {
             DirectoryInfo _di = new DirectoryInfo(AccessPath);
             List<FileInfo2> ret_val = new List<FileInfo2>();
@@ -57,10 +57,12 @@ namespace FileSyncLibNet.AccessProviders
                         searchPattern: pattern,
                         searchOption: recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 
-
-                    ret_val.AddRange(_fi.Select(x => new FileInfo2(x.FullName.Substring(AccessPath.Length + 1), x.Exists) { Length = x.Length, LastWriteTime = x.LastWriteTime }).ToList());
+                    ret_val.AddRange(_fi.Where(x => (olderFiles ? x.LastWriteTime <= minimumLastWriteTime : x.LastWriteTime >= minimumLastWriteTime))
+                        .Select(x => new FileInfo2(x.FullName.Substring(AccessPath.Length + 1), x.Exists) { Length = x.Length, LastWriteTime = x.LastWriteTime })
+                        .ToList());
                 }
-                catch (Exception exc) {
+                catch (Exception exc)
+                {
                     logger?.LogError(exc, "exception in GetFiles for path {A}, dir {B}", path, dir);
                 }
             }

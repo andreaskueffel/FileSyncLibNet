@@ -18,6 +18,7 @@ namespace FileSyncLibNet.FileSyncJob
         private readonly Timer timer;
         private readonly ISyncProvider syncProvider;
         private volatile bool v_jobRunning = false;
+        public static bool InitialFullSync { get; set; } = false;
 
         private FileSyncJob(IFileJobOptions fileSyncJobOptions)
         {

@@ -52,7 +52,7 @@ namespace FileSyncAppWin
                 Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
                 AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
                 ApplicationConfiguration.Initialize();
-                mainForm = new MainForm();
+                mainForm = new MainForm(args);
                 Application.Run(mainForm);
             }
             catch (Exception exception)
