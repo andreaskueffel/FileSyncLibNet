@@ -58,11 +58,11 @@ namespace FileSyncLibNet.SyncProviders
             bool createDestinationDir = true;
             int copied = 0;
             int skipped = 0;
-            DateTimeOffset minimumLastWriteTime = new DateTimeOffset(1970, 0, 0, 0, 0, 0, TimeSpan.Zero);
+            DateTimeOffset minimumLastWriteTime = new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero);
             if (jobOptions.RememberLastSync)
             {
                 if (LastRun.ToUnixTimeMilliseconds() == 0)
-                    LastRun = jobOptions.MaxAge < jobOptions.Interval ? new DateTimeOffset(1970, 0, 0, 0, 0, 0, TimeSpan.Zero) : DateTimeOffset.Now - jobOptions.MaxAge;
+                    LastRun = jobOptions.MaxAge < jobOptions.Interval ? new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero) : DateTimeOffset.Now - jobOptions.MaxAge;
                 minimumLastWriteTime = LastRun - jobOptions.Interval - jobOptions.Interval;
             }
             else
