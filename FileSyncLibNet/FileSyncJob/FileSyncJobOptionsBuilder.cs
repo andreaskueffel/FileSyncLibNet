@@ -58,11 +58,7 @@ namespace FileSyncLibNet.FileSyncJob
             jobOptions.RememberLastSync = rememberLastSync;
             return this;
         }
-        public IFileSyncJobOptionsBuilderSetProperties RememberRemoteState(bool rememberRemoteState)
-        {
-            jobOptions.RememberRemoteState = rememberRemoteState;
-            return this;
-        }
+
         public IFileSyncJobOptionsBuilderSetProperties WithMaxAge(TimeSpan maxAge)
         {
             jobOptions.MaxAge = maxAge;

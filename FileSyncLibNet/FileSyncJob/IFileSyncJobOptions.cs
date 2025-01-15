@@ -9,7 +9,6 @@ namespace FileSyncLibNet.FileSyncJob
         bool DeleteSourceAfterBackup { get; set; }
         bool SyncDeleted { get; set; }
         bool RememberLastSync { get; set; }
-        bool RememberRemoteState { get; set; }
         TimeSpan MaxAge { get; set; }
     }
 }

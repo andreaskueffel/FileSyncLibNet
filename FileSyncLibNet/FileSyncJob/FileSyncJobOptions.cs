@@ -14,7 +14,6 @@ namespace FileSyncLibNet.FileSyncJob
         public bool SyncDeleted { get; set; } = false;
         public bool DeleteSourceAfterBackup { get; set; } = false;
         public bool RememberLastSync { get; set; } = true;
-        public bool RememberRemoteState { get; set; } = false;
         public TimeSpan MaxAge { get; set; }
 
         public FileSyncJobOptions()
