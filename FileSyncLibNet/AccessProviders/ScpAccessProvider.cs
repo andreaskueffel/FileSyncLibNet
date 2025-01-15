@@ -17,7 +17,7 @@ namespace FileSyncLibNet.AccessProviders
         SftpClient ftpClient;
         private readonly RemoteState remoteState;
         public string AccessPath { get; private set; }
-        
+
         private readonly ILogger logger;
         public ScpAccessProvider(NetworkCredential credentials, ILogger logger, string stateFilename)
         {
@@ -137,7 +137,7 @@ namespace FileSyncLibNet.AccessProviders
             return Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase);
         }
 
-        public List<FileInfo2> GetFiles(DateTime minimumLastWriteTime, string pattern, string path = null, bool recursive = false, List<string> subfolders = null)
+        public List<FileInfo2> GetFiles(DateTime minimumLastWriteTime, string pattern, string path = null, bool recursive = false, List<string> subfolders = null, bool olderFiles = false)
         {
             //add try catch for non existent folders
             EnsureConnected();
@@ -156,7 +156,7 @@ namespace FileSyncLibNet.AccessProviders
                 try
                 {
                     var files = ftpClient.ListDirectory(basePath);
-                    var sepChar="/";
+                    var sepChar = "/";
                     if (recursive)
                     {
                         foreach (var folder in files.Where(x => x.IsDirectory && !(x.Name == ".") && !(x.Name == "..")))
@@ -165,8 +165,8 @@ namespace FileSyncLibNet.AccessProviders
                             ret_val.AddRange(GetFiles(minimumLastWriteTime, pattern, subPath, recursive));
                         }
                     }
-                    ret_val.AddRange(files.Where(x => MatchesPattern(x.Name, pattern)).Where(x => x.LastWriteTime >= minimumLastWriteTime && !x.IsDirectory).Select(x =>
-                    new FileInfo2($"{(AccessPath.Length + 1<basePath.Length?(basePath.Substring(AccessPath.Length+1))+sepChar:string.Empty)}{x.Name}", exists: true) { LastWriteTime = x.LastWriteTime, Length = x.Length }).ToList());
+                    ret_val.AddRange(files.Where(x => MatchesPattern(x.Name, pattern)).Where(x => (olderFiles ? x.LastWriteTime <= minimumLastWriteTime : x.LastWriteTime >= minimumLastWriteTime) && !x.IsDirectory).Select(x =>
+                    new FileInfo2($"{(AccessPath.Length + 1 < basePath.Length ? (basePath.Substring(AccessPath.Length + 1)) + sepChar : string.Empty)}{x.Name}", exists: true) { LastWriteTime = x.LastWriteTime, Length = x.Length }).ToList());
                 }
                 catch (Exception exc)
                 {
