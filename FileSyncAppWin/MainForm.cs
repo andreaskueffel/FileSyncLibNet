@@ -4,13 +4,13 @@ namespace FileSyncAppWin
     {
         Thread consoleThread;
 
-        public MainForm()
+        public MainForm(string[] args)
         {
             InitializeComponent();
             this.FormClosing += (s, e) => { FileSyncApp.Program.keepRunning = false; consoleThread?.Join(10_000); };
             consoleThread = new Thread(() =>
             {
-                FileSyncApp.Program.Main(null);
+                FileSyncApp.Program.Main(args);
             });
             FileSyncApp.Program.JobsReady += (s, e) =>
             {
