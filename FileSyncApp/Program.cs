@@ -25,7 +25,7 @@ namespace FileSyncApp
         public static Dictionary<string, IFileJob> Jobs = new Dictionary<string, IFileJob>();
         public static void Main(string[] args)
         {
-            ConfigureLogger(args.FirstOrDefault());
+            ConfigureLogger(args?.FirstOrDefault());
             log = LoggerFactory.CreateLogger("FileSyncAppMain");
             if (null != args && args.Length > 0)
             {
@@ -50,6 +50,7 @@ namespace FileSyncApp
                 ContractResolver = new IgnorePropertyResolver(new string[] { "Logger" }),
                 TypeNameHandling = TypeNameHandling.Auto,
             };
+
             if (!File.Exists("config.json"))
             {
                 log.LogInformation("Config file {A} not found, creating a new one", "config.json");
@@ -96,10 +97,19 @@ namespace FileSyncApp
                 var json = JsonConvert.SerializeObject(jobOptions, Formatting.Indented, jsonSettings);
                 File.WriteAllText("config.json", json);
             }
-            log.LogInformation("reading config file {A}", "config.json");
-            var readJobOptions = JsonConvert.DeserializeObject<Dictionary<string, IFileJobOptions>>(File.ReadAllText("config.json"), jsonSettings);
-            //List<IFileJob> Jobs = new List<IFileJob>();
 
+            log.LogInformation("reading config file {A}", "config.json");
+            Dictionary<string, IFileJobOptions> readJobOptions=new Dictionary<string, IFileJobOptions>();
+            try
+            {
+                readJobOptions = JsonConvert.DeserializeObject<Dictionary<string, IFileJobOptions>>(File.ReadAllText("config.json"), jsonSettings);
+            }
+            catch (Exception exc)
+            {
+                log.LogCritical(exc, "exception reading config file {A}", "config.json");
+                return;
+            }
+            
             foreach (var jobOption in readJobOptions)
             {
 
