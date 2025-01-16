@@ -2,13 +2,14 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FileSyncAppConfigEditor\FileSyncAppConfigEditor.csproj" />
     <ProjectReference Include="..\FileSyncApp\FileSyncApp.csproj" />
   </ItemGroup>
 
