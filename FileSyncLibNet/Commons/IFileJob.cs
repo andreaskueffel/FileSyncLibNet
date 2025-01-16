@@ -8,6 +8,7 @@ namespace FileSyncLibNet.Commons
 {
     public interface IFileJob
     {
+        void StopJob();
         void StartJob();
         void ExecuteNow();
         Task ExecuteNowASync();
