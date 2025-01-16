@@ -32,6 +32,10 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             textBox1 = new TextBox();
             notifyIcon1 = new NotifyIcon(components);
+            panel1 = new Panel();
+            btn_Config = new Button();
+            btn_Restart = new Button();
+            panel1.SuspendLayout();
             SuspendLayout();
             // 
             // textBox1
@@ -42,7 +46,7 @@
             textBox1.Name = "textBox1";
             textBox1.ReadOnly = true;
             textBox1.ScrollBars = ScrollBars.Vertical;
-            textBox1.Size = new Size(800, 450);
+            textBox1.Size = new Size(732, 299);
             textBox1.TabIndex = 0;
             // 
             // notifyIcon1
@@ -50,21 +54,58 @@
             notifyIcon1.Icon = (Icon)resources.GetObject("notifyIcon1.Icon");
             notifyIcon1.Text = "FileSyncAppWin";
             // 
+            // panel1
+            // 
+            panel1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            panel1.Controls.Add(textBox1);
+            panel1.Location = new Point(0, 0);
+            panel1.Name = "panel1";
+            panel1.Size = new Size(732, 299);
+            panel1.TabIndex = 1;
+            // 
+            // btn_Config
+            // 
+            btn_Config.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            btn_Config.Location = new Point(562, 326);
+            btn_Config.Name = "btn_Config";
+            btn_Config.Size = new Size(75, 23);
+            btn_Config.TabIndex = 2;
+            btn_Config.Text = "Config";
+            btn_Config.UseVisualStyleBackColor = true;
+            btn_Config.Click += btn_Config_Click;
+            // 
+            // btn_Restart
+            // 
+            btn_Restart.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            btn_Restart.Location = new Point(647, 326);
+            btn_Restart.Name = "btn_Restart";
+            btn_Restart.Size = new Size(75, 23);
+            btn_Restart.TabIndex = 3;
+            btn_Restart.Text = "Restart";
+            btn_Restart.UseVisualStyleBackColor = true;
+            btn_Restart.Click += btn_Restart_Click;
+            // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 450);
-            Controls.Add(textBox1);
+            ClientSize = new Size(734, 361);
+            Controls.Add(btn_Restart);
+            Controls.Add(btn_Config);
+            Controls.Add(panel1);
             Name = "MainForm";
             Text = "FileSyncAppWin";
+            panel1.ResumeLayout(false);
+            panel1.PerformLayout();
             ResumeLayout(false);
-            PerformLayout();
         }
 
         #endregion
 
         private TextBox textBox1;
         private NotifyIcon notifyIcon1;
+        private Panel panel1;
+        private Button btn_Config;
+        private Button btn_Restart;
     }
 }
