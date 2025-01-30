@@ -9,7 +9,13 @@ namespace FileSyncAppWin
         {
             InitializeComponent();
             Args = args;
-            this.FormClosing += (s, e) => { FileSyncApp.Program.keepRunning = false; consoleThread?.Join(10_000); };
+            this.FormClosing += (s, e) => {
+                NewLogOutput($"FormClosing, Reason {e.CloseReason}");
+                FileSyncApp.Program.keepRunning = false; 
+                Program.autoRestart = false;
+                consoleThread?.Join(10_000);
+                NewLogOutput($"FormClosing, Reason {e.CloseReason}, consoleThread joined");
+            };
             
             FileSyncApp.Program.JobsReady += (s, e) =>
             {

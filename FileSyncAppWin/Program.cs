@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.IO.Pipes;
 
 namespace FileSyncAppWin
@@ -7,10 +8,11 @@ namespace FileSyncAppWin
     {
 
         private static Mutex mutex = new Mutex(true, "PraewemaFileSyncAppWin");
-        private static volatile bool autoRestart = true;
+        internal static volatile bool autoRestart = true;
         private static ILogger logger;
         private static Form mainForm;
         private const string PipeName = "PraewemaFileSyncAppWinPipe";
+        private static string[] _args;
 
         /// <summary>
         ///  The main entry point for the application.
@@ -18,6 +20,7 @@ namespace FileSyncAppWin
         [STAThread]
         static void Main(string[] args)
         {
+            _args = args;
             FileSyncApp.Program.ConfigureLogger(args.FirstOrDefault());
             logger = FileSyncApp.Program.LoggerFactory.CreateLogger("FileSyncAppWin");
             if (args.Contains("noautorestart"))
@@ -147,13 +150,17 @@ namespace FileSyncAppWin
             if (autoRestart)
             {
                 // Get the path of the current application
-                string assemblyPath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+                string assemblyPath = Environment.ProcessPath;
                 // Restart the application using the path
                 logger?.LogInformation("RestartApplication, starting new process {A}", assemblyPath);
-                System.Diagnostics.Process.Start(assemblyPath);
+                ProcessStartInfo processStartInfo = new ProcessStartInfo(assemblyPath);
+                processStartInfo.Arguments = string.Join(' ',_args);
+                processStartInfo.WorkingDirectory = Path.GetDirectoryName(assemblyPath);
+                Process.Start(assemblyPath);
 
                 // Exit the current instance of the application
-                Environment.Exit(0);
+
+                Environment.Exit(-1);
             }
             else
             {
