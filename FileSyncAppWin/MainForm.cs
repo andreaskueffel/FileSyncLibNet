@@ -3,15 +3,20 @@ namespace FileSyncAppWin
     public partial class MainForm : Form
     {
         Thread consoleThread;
+        string[] Args;
 
         public MainForm(string[] args)
         {
             InitializeComponent();
-            this.FormClosing += (s, e) => { FileSyncApp.Program.keepRunning = false; consoleThread?.Join(10_000); };
-            consoleThread = new Thread(() =>
-            {
-                FileSyncApp.Program.Main(args);
-            });
+            Args = args;
+            this.FormClosing += (s, e) => {
+                NewLogOutput($"FormClosing, Reason {e.CloseReason}");
+                FileSyncApp.Program.keepRunning = false; 
+                Program.autoRestart = false;
+                consoleThread?.Join(10_000);
+                NewLogOutput($"FormClosing, Reason {e.CloseReason}, consoleThread joined");
+            };
+            
             FileSyncApp.Program.JobsReady += (s, e) =>
             {
                 foreach (var job in FileSyncApp.Program.Jobs)
@@ -33,8 +38,7 @@ namespace FileSyncAppWin
 
 
             };
-            consoleThread.Start();
-            
+           
             this.Resize += ((s, e) =>
             {
                 this.SuspendLayout();
@@ -57,11 +61,26 @@ namespace FileSyncAppWin
             };
             notifyIcon1.BalloonTipClicked += (s, e) => { this.BeginInvoke(() => { WindowState = FormWindowState.Normal; ShowInTaskbar = true; }); };
             //notifyIcon1.BalloonTipShown += (s, e) => { ShowInTaskbar = false; };
-
+            StartConsoleThread();
             //this.WindowState = FormWindowState.Minimized;
         }
 
+        void StartConsoleThread()
+        {
+            consoleThread = new Thread(() =>
+            {
+                FileSyncApp.Program.Main(Args);
+            });
+            consoleThread.Start();
 
+        }
+        void Restart()
+        {
+            FileSyncApp.Program.keepRunning = false;
+            consoleThread?.Join(10_000);
+            FileSyncApp.Program.keepRunning = true;
+            StartConsoleThread();
+        }
 
 
         private void NewLogOutput(string e)
@@ -69,6 +88,17 @@ namespace FileSyncAppWin
 
             this.BeginInvoke(() => { textBox1.Text = string.Join(Environment.NewLine, (new string[] { $"{DateTime.Now.ToString("HH:mm:ss.fff")} {e}" }).Concat(textBox1.Text.Split(Environment.NewLine).Take(1000))); });
 
+        }
+
+        private void btn_Config_Click(object sender, EventArgs e)
+        {
+            FileSyncAppConfigEditor.JobsEditForm jobsEditForm = new FileSyncAppConfigEditor.JobsEditForm("config.json");
+            jobsEditForm.ShowDialog();
+        }
+
+        private void btn_Restart_Click(object sender, EventArgs e)
+        {
+            Restart();
         }
     }
 }

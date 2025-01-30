@@ -129,6 +129,11 @@ namespace FileSyncApp
             {
                 Thread.Sleep(500);
             }
+            foreach(var job in Jobs)
+            {
+                job.Value.StopJob();
+            }
+            Jobs.Clear();
         }
 
 
