@@ -20,6 +20,7 @@ namespace FileSyncAppWin
         [STAThread]
         static void Main(string[] args)
         {
+        
             _args = args;
             FileSyncApp.Program.ConfigureLogger(args.FirstOrDefault());
             logger = FileSyncApp.Program.LoggerFactory.CreateLogger("FileSyncAppWin");

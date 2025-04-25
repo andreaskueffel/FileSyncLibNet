@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FileSyncApp": {
+      "commandName": "Project",
+      "commandLineArgs": "Verbose"
+    }
+  }
+}
