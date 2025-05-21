@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace FileSyncLibNet.AccessProviders
 {
@@ -12,6 +13,9 @@ namespace FileSyncLibNet.AccessProviders
         public string AccessPath { get; private set; }
         private readonly RemoteState remoteState;
         private readonly ILogger logger;
+        private const int DefaultBandwidthLimit = 100 * 1024 * 1024; // 100 MB/s
+        private int bandwidthLimit = DefaultBandwidthLimit;
+
         public FileIoAccessProvider(ILogger logger, string stateFilename)
         {
             this.logger = logger;
@@ -38,7 +42,7 @@ namespace FileSyncLibNet.AccessProviders
 
             return new FileInfo2(path, fi.Exists)
             {
-                LastWriteTime = fi.Exists ? fi.LastWriteTime : DateTime.MinValue,
+                LastWriteTime = fi.Exists ? new DateTime(fi.LastWriteTime.Ticks) : DateTime.MinValue,
                 Length = fi.Exists ? fi.Length : 0
             };
         }
@@ -79,9 +83,28 @@ namespace FileSyncLibNet.AccessProviders
         {
             var realFilename = Path.Combine(AccessPath, file.Name);
             Directory.CreateDirectory(Path.GetDirectoryName(realFilename));
-            using (var stream = File.Create(realFilename))
+            if (bandwidthLimit == DefaultBandwidthLimit)
             {
-                content.CopyTo(stream);
+                using (var stream = File.Create(realFilename))
+                {
+                    content.CopyTo(stream);
+                }
+            }
+            else
+            {
+                using (var stream = new FileStream(realFilename, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.None))
+                {
+                    int sleepIntervalMs = 50; // Fixed sleep interval
+                    int bufferSize = bandwidthLimit / (1000 / sleepIntervalMs); // Calculate buffer size based on bandwidth limit and interval
+                    byte[] buffer = new byte[bufferSize];
+                    int bytesRead;
+
+                    while ((bytesRead = content.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        stream.Write(buffer, 0, bytesRead);
+                        Thread.Sleep(sleepIntervalMs); // Sleep for the fixed interval
+                    }
+                }
             }
             File.SetLastWriteTime(realFilename, file.LastWriteTime);
             remoteState?.SetFileInfo(realFilename, file);
