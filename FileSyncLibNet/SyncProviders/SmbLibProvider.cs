@@ -84,7 +84,7 @@ namespace FileSyncLibNet.SyncProviders
                     if (jobOptions.RememberLastSync)
                     {
                         _fi = _fi.Where(x => x.LastWriteTime > (LastRun - jobOptions.Interval));
-                        LastRun = DateTimeOffset.Now;
+
                     }
                     if (jobOptions.SyncDeleted)
                     {
@@ -100,12 +100,12 @@ namespace FileSyncLibNet.SyncProviders
                     {
                         bool copy = false;
                         var relativeFilename = f.FullName.Substring(Path.GetFullPath(jobOptions.SourcePath).Length);
-                        var remotefile = Path.Combine(DestinationPath, relativeFilename.TrimStart('\\', '/')).Replace('/', '\\');
+                        var remotefile = Path.Combine(DestinationPath, relativeFilename.TrimStart('\\', '/')).Replace('/', '\\').TrimStart('/');
                         var exists = FileExists(remotefile, out long size);
                         copy = !exists || size != f.Length;
                         if (copy)
                         {
-                            logger.LogDebug("Copy {A}", relativeFilename);
+                            logger.LogDebug("Copy {A} to {B}", f.FullName, remotefile);
                             try
                             {
                                 WriteFile(f.FullName, remotefile);
@@ -148,7 +148,7 @@ namespace FileSyncLibNet.SyncProviders
                 }
 
                 Directory.CreateDirectory(jobOptions.DestinationPath);
-                foreach(var subfolder in jobOptions.Subfolders)
+                foreach (var subfolder in jobOptions.Subfolders)
                     Directory.CreateDirectory(Path.Combine(jobOptions.DestinationPath, subfolder));
                 DirectoryInfo _di = new DirectoryInfo(jobOptions.DestinationPath);
                 foreach (var dir in JobOptions.Subfolders.Count > 0 ? _di.GetDirectories() : new[] { _di })
@@ -212,6 +212,7 @@ namespace FileSyncLibNet.SyncProviders
 
             }
             sw.Stop();
+            LastRun = DateTimeOffset.Now;
             logger.LogInformation("{A} files copied, {B} files skipped in {C}s", copied, skipped, sw.ElapsedMilliseconds / 1000.0);
         }
 
@@ -247,7 +248,7 @@ namespace FileSyncLibNet.SyncProviders
             }
 
 
-         
+
         }
 
         public void Dispose()
@@ -308,7 +309,15 @@ namespace FileSyncLibNet.SyncProviders
                 string createpath = "";
                 for (int i = 0; i < paths.Length - 1; i++)
                 {
+
                     createpath = Path.Combine(createpath, paths[i]);
+
+                    createpath = createpath.Replace('/', '\\');
+                    var exists = DirExists(createpath);
+
+                    if (exists)
+                        continue;
+                    logger.LogDebug("Create path {A}", createpath);
                     status = fileStore.CreateFile(out fileHandle, out fileStatus, createpath, AccessMask.GENERIC_WRITE | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.None, CreateDisposition.FILE_OPEN_IF, CreateOptions.FILE_DIRECTORY_FILE, null);
                     if (status == NTStatus.STATUS_SUCCESS)
                     {
@@ -385,7 +394,7 @@ namespace FileSyncLibNet.SyncProviders
                             {
                                 try
                                 {
-                                    retval.AddRange(ListFiles(sourcePath,Path.Combine(sourcesubPath, file.FileName).Trim('\\'), recurse, maxAge, out int moreSkipped));
+                                    retval.AddRange(ListFiles(sourcePath, Path.Combine(sourcesubPath, file.FileName).Trim('\\'), recurse, maxAge, out int moreSkipped));
                                     skipped += moreSkipped;
                                 }
                                 catch { }
@@ -410,6 +419,23 @@ namespace FileSyncLibNet.SyncProviders
             return retval;
         }
 
+        bool DirExists(string filepathFromShare)
+        {
+            object directoryHandle;
+            FileStatus fileStatus;
+            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, filepathFromShare.Trim('\\'), AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE, null);
+            if (status == NTStatus.STATUS_SUCCESS)
+            {
+                status = fileStore.GetFileInformation(out FileInformation result, directoryHandle, FileInformationClass.FileStandardInformation);
+
+                status = fileStore.CloseFile(directoryHandle);
+                return true;
+            }
+
+            return false;
+
+        }
+
         bool FileExists(string filepathFromShare, out long size)
         {
             object directoryHandle;
@@ -430,19 +456,23 @@ namespace FileSyncLibNet.SyncProviders
         {
             object directoryHandle;
             FileStatus fileStatus;
-            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, filepathFromShare.Trim('\\'), AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE, null);
+            //var status = fileStore.CreateFile(out directoryHandle, out fileStatus, filepathFromShare.Trim('\\'), AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE, null);
+            var status = fileStore.CreateFile(out directoryHandle, out fileStatus, filepathFromShare.Trim('\\'), AccessMask.GENERIC_READ | AccessMask.GENERIC_WRITE | AccessMask.SYNCHRONIZE, FileAttributes.Normal, ShareAccess.None, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE | CreateOptions.FILE_SYNCHRONOUS_IO_ALERT, null);
             if (status == NTStatus.STATUS_SUCCESS)
             {
-                
+
                 status = fileStore.GetFileInformation(out FileInformation result, directoryHandle, FileInformationClass.FileBasicInformation);
-                (result as FileBasicInformation).LastWriteTime=lastWriteTime;
-                (result as FileBasicInformation).CreationTime=createTime;
-                (result as FileBasicInformation).ChangeTime=modifiedTime;
-                (result as FileBasicInformation).LastAccessTime=accessTime;
+                (result as FileBasicInformation).LastWriteTime = lastWriteTime;
+                (result as FileBasicInformation).CreationTime = createTime;
+                (result as FileBasicInformation).ChangeTime = modifiedTime;
+                (result as FileBasicInformation).LastAccessTime = accessTime;
                 status = fileStore.SetFileInformation(directoryHandle, result);
+                if (status != NTStatus.STATUS_SUCCESS)
+                    throw new Exception("unable to set attributes - status " + status);
                 status = fileStore.CloseFile(directoryHandle);
             }
-            throw new Exception("unable to set attributes - status " + status);
+            if (status != NTStatus.STATUS_SUCCESS)
+                throw new Exception("unable to set attributes - status " + status);
 
         }
         void GetFileAttributes(string filepathFromShare, out DateTime lastWriteTime, out DateTime createTime, out DateTime modifiedTime, out DateTime accessTime)
