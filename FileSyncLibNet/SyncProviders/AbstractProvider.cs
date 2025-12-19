@@ -5,6 +5,7 @@ using FileSyncLibNet.FileSyncJob;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace FileSyncLibNet.SyncProviders
 {
@@ -130,48 +131,106 @@ namespace FileSyncLibNet.SyncProviders
                                                         pattern: JobOptions.SearchPattern,
                                                         recursive: JobOptions.Recursive,
                                                         subfolders: JobOptions.Subfolders);
-                foreach (var sourceFile in sourceFiles)
+
+                bool parallel = false;
+                if (parallel)
                 {
-                    var remoteFile = DestinationAccess.GetFileInfo(sourceFile.Name);
-                    bool copy = !remoteFile.Exists || remoteFile.Length != sourceFile.Length || remoteFile.LastWriteTime != sourceFile.LastWriteTime;
-                    if (copy)
+                    Parallel.ForEach(sourceFiles, (sourceFile) =>
                     {
-                        if (createDestinationDir)
+                        var remoteFile = DestinationAccess.GetFileInfo(sourceFile.Name);
+                        bool copy = !remoteFile.Exists || remoteFile.Length != sourceFile.Length || remoteFile.LastWriteTime != sourceFile.LastWriteTime;
+                        if (copy)
                         {
+                            if (createDestinationDir)
+                            {
+                                try
+                                {
+                                    DestinationAccess.CreateDirectory("");
+                                }
+                                catch (Exception ex) { logger?.LogError(ex, "exception creating destination directory {A}", jobOptions.DestinationPath); }
+                                createDestinationDir = false;
+                            }
                             try
                             {
-                                DestinationAccess.CreateDirectory("");
+                                logger.LogDebug("Copy {A}", sourceFile.Name);
+                                using (var sourceStream = SourceAccess.GetStream(sourceFile))
+                                {
+                                    DestinationAccess.WriteFile(sourceFile, sourceStream);
+                                }
+                                //file.copy
+                                copied++;
+                                if (jobOptions.DeleteSourceAfterBackup)
+                                {
+                                    SourceAccess.Delete(sourceFile);
+                                }
                             }
-                            catch (Exception ex) { logger?.LogError(ex, "exception creating destination directory {A}", jobOptions.DestinationPath); }
-                            createDestinationDir = false;
-                        }
-                        try
-                        {
-                            logger.LogDebug("Copy {A}", sourceFile.Name);
-                            using (var sourceStream = SourceAccess.GetStream(sourceFile))
+                            catch (Exception exc)
                             {
-                                DestinationAccess.WriteFile(sourceFile, sourceStream);
-                            }
-                            //file.copy
-                            copied++;
-                            if (jobOptions.DeleteSourceAfterBackup)
-                            {
-                                SourceAccess.Delete(sourceFile);
+                                error_occured = true;
+                                logger.LogError(exc, "Exception copying {A}", sourceFile);
                             }
                         }
-                        catch (Exception exc)
+                        else
                         {
-                            error_occured = true;
-                            logger.LogError(exc, "Exception copying {A}", sourceFile);
+
+                            skipped++;
+                            if (skipped % 1000 == 0)
+                            {
+                                logger.LogTrace("Skip {A} {B}", skipped, sourceFile);
+                            }
+                            //logger.LogTrace("Skip {A} {B}", skipped, sourceFile);
                         }
-                    }
-                    else
+                    });
+                }
+                else
+                {
+                    foreach (var sourceFile in sourceFiles)
                     {
+                        var remoteFile = DestinationAccess.GetFileInfo(sourceFile.Name);
+                        bool copy = !remoteFile.Exists || remoteFile.Length != sourceFile.Length || remoteFile.LastWriteTime != sourceFile.LastWriteTime;
+                        if (copy)
+                        {
+                            if (createDestinationDir)
+                            {
+                                try
+                                {
+                                    DestinationAccess.CreateDirectory("");
+                                }
+                                catch (Exception ex) { logger?.LogError(ex, "exception creating destination directory {A}", jobOptions.DestinationPath); }
+                                createDestinationDir = false;
+                            }
+                            try
+                            {
+                                logger.LogDebug("Copy {A}", sourceFile.Name);
+                                using (var sourceStream = SourceAccess.GetStream(sourceFile))
+                                {
+                                    DestinationAccess.WriteFile(sourceFile, sourceStream);
+                                }
+                                //file.copy
+                                copied++;
+                                if (jobOptions.DeleteSourceAfterBackup)
+                                {
+                                    SourceAccess.Delete(sourceFile);
+                                }
+                            }
+                            catch (Exception exc)
+                            {
+                                error_occured = true;
+                                logger.LogError(exc, "Exception copying {A}", sourceFile);
+                            }
+                        }
+                        else
+                        {
 
-                        skipped++;
-                        logger.LogTrace("Skip {A}", sourceFile);
+                            skipped++;
+                            if (skipped % 1000 == 0)
+                            {
+                                logger.LogTrace("Skip {A} {B}", skipped, sourceFile);
+                            }
+                            //logger.LogTrace("Skip {A} {B}", skipped, sourceFile);
+                        }
+
                     }
-
                 }
                 if (!error_occured)
                 {

@@ -110,6 +110,7 @@ namespace FileSyncLibNet.FileSyncJob
             }
             catch (Exception exc)
             {
+                options.Logger.LogError(exc, "JobError {0}", JobName);
                 JobError?.Invoke(this, new FileSyncJobEventArgs(JobName, FileSyncJobStatus.Error, exc));
             }
             finally
