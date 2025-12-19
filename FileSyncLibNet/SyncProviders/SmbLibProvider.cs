@@ -163,7 +163,6 @@ namespace FileSyncLibNet.SyncProviders
 
                     var remoteFiles = ListFiles(SourcePath, dir.Name, JobOptions.Recursive, jobOptions.RememberLastSync ? LastRun - jobOptions.Interval : DateTime.MinValue, out int skippedByTimestamp);
                     skipped += skippedByTimestamp;
-                    LastRun = DateTimeOffset.Now;
                     if (jobOptions.SyncDeleted)
                     {
                         foreach (var file in remoteFiles)

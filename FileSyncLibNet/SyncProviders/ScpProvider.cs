@@ -89,7 +89,6 @@ namespace FileSyncLibNet.SyncProviders
                     var old = _fi.Count();
                     _fi = _fi.Where(x => x.LastWriteTime > (LastRun - jobOptions.Interval)).ToList();
                     skipped += old - _fi.Count();
-                    LastRun = DateTimeOffset.Now;
                 }
                 foreach (FileInfo f in _fi)
                 {
@@ -136,6 +135,8 @@ namespace FileSyncLibNet.SyncProviders
                     }
                 }
             }
+            if (jobOptions.RememberLastSync)
+                LastRun = DateTimeOffset.Now;
             sw.Stop();
             logger.LogInformation("{A} files copied, {B} files skipped in {C}s", copied, skipped, sw.ElapsedMilliseconds / 1000.0);
         }
